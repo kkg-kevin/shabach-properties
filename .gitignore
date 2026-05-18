@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Supabase local state
+.supabase/
+supabase/.branches/
+supabase/.temp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime and cache files
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# Editor and OS files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# OneDrive and Windows temporary files
+~$*
+*.tmp
+*.temp
+desktop.ini
