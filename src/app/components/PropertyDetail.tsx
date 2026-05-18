@@ -70,7 +70,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5E2CA5] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2DB34A] mx-auto"></div>
           <p className="text-gray-600 mt-4">Loading property details...</p>
         </div>
       </div>
@@ -137,7 +137,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                         onClick={() => setSelectedImage(index)}
                         className={`aspect-video rounded-lg overflow-hidden border-2 transition-all ${
                           selectedImage === index
-                            ? 'border-[#5E2CA5]'
+                            ? 'border-[#2DB34A]'
                             : 'border-transparent hover:border-gray-300'
                         }`}
                       >
@@ -178,14 +178,14 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
               <CardContent className="space-y-6">
                 <div className="flex flex-wrap gap-6">
                   <div className="flex items-center gap-2">
-                    <Home className="w-5 h-5 text-[#5E2CA5]" />
+                    <Home className="w-5 h-5 text-[#2DB34A]" />
                     <div>
                       <p className="text-sm text-gray-500">Size</p>
                       <p className="font-semibold">{property.size}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-[#5E2CA5]" />
+                    <Calendar className="w-5 h-5 text-[#2DB34A]" />
                     <div>
                       <p className="text-sm text-gray-500">Listed</p>
                       <p className="font-semibold">
@@ -223,9 +223,9 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                 <CardTitle>Location</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="aspect-video bg-gradient-to-br from-[#5E2CA5]/10 to-[#1E3A8A]/10 rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="aspect-video bg-gradient-to-br from-[#2DB34A]/10 to-[#1E3A8A]/10 rounded-lg overflow-hidden flex items-center justify-center">
                   <div className="text-center p-8">
-                    <MapPin className="w-16 h-16 text-[#5E2CA5] mx-auto mb-4" />
+                    <MapPin className="w-16 h-16 text-[#2DB34A] mx-auto mb-4" />
                     <h4 className="text-xl font-semibold mb-2">{property.location}</h4>
                     <p className="text-gray-600">
                       Exact location coordinates will be shared during your site visit
@@ -246,7 +246,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
               <CardContent className="p-6 space-y-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Price</p>
-                  <p className="text-4xl font-bold text-[#5E2CA5]">
+                  <p className="text-4xl font-bold text-[#16872E]">
                     KSh {property.price}
                   </p>
                 </div>
@@ -261,7 +261,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                   </Button>
                   <Button
                     onClick={() => document.getElementById('inquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="w-full bg-[#5E2CA5] hover:bg-[#5E2CA5]/90 text-lg h-12"
+                    className="w-full bg-[#1E3A8A] hover:bg-[#172E70] text-lg h-12"
                   >
                     Book Site Visit
                   </Button>
@@ -300,7 +300,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#5E2CA5] focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2DB34A]/20 focus:border-[#2DB34A] outline-none"
                       placeholder="John Doe"
                     />
                   </div>
@@ -315,7 +315,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                       required
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#5E2CA5] focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2DB34A]/20 focus:border-[#2DB34A] outline-none"
                       placeholder="+254 700 000 000"
                     />
                   </div>
@@ -330,7 +330,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#5E2CA5] focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2DB34A]/20 focus:border-[#2DB34A] outline-none"
                       placeholder="john@example.com"
                     />
                   </div>
@@ -343,7 +343,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                       rows={4}
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#5E2CA5] focus:border-transparent outline-none resize-none"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2DB34A]/20 focus:border-[#2DB34A] outline-none resize-none"
                       placeholder="Tell us about your interest..."
                     />
                   </div>
@@ -351,7 +351,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                   <Button
                     type="submit"
                     disabled={submitting}
-                    className="w-full bg-[#5E2CA5] hover:bg-[#5E2CA5]/90"
+                    className="w-full bg-[#2DB34A] hover:bg-[#23923B]"
                   >
                     {submitting ? 'Sending...' : 'Send Inquiry'}
                   </Button>
