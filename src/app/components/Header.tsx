@@ -43,7 +43,7 @@ export function Header() {
           <div className="hidden items-center gap-4 lg:flex">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Phone className="h-4 w-4 text-[#2DB34A]" />
-              <span>+254 700 000 000</span>
+              <span>+254 727 496 461</span>
             </div>
             <Button className="rounded-md bg-[#1E3A8A] hover:bg-[#172E70]">
               Call Us
