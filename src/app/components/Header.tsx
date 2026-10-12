@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Building2, Menu, Phone, X } from 'lucide-react';
+import { Menu, Phone, X } from 'lucide-react';
 import { Button } from './ui/button';
+import logo from '../../assets/images/logo.jpg';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -19,9 +20,7 @@ export function Header() {
         <div className="flex h-20 items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#9A8A00] bg-white shadow-sm">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2DB34A]/10 text-[#1E3A8A]">
-                <Building2 className="h-6 w-6" />
-              </div>
+              <img src={logo} alt="Shabach Properties Logo" className="h-10 w-10 rounded-full object-cover" />
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold text-[#111827]">Shabach Properties</span>
@@ -44,7 +43,7 @@ export function Header() {
           <div className="hidden items-center gap-4 lg:flex">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Phone className="h-4 w-4 text-[#2DB34A]" />
-              <span>+254 700 000 000</span>
+              <span>+254 727 496 461</span>
             </div>
             <Button className="rounded-md bg-[#1E3A8A] hover:bg-[#172E70]">
               Call Us

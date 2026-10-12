@@ -1,7 +1,8 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
-import * as kv from "./kv_store.tsx";
+import * as mongodb from "./kv_store.tsx";
+
 const app = new Hono();
 
 // Enable logger
@@ -21,7 +22,7 @@ app.use(
 
 // Health check endpoint
 app.get("/make-server-4868b0da/health", (c) => {
-  return c.json({ status: "ok" });
+  return c.json({ status: "ok", database: "MongoDB Atlas" });
 });
 
 // ==================== PROPERTIES ENDPOINTS ====================
@@ -29,7 +30,7 @@ app.get("/make-server-4868b0da/health", (c) => {
 // Get all properties
 app.get("/make-server-4868b0da/properties", async (c) => {
   try {
-    const properties = await kv.getByPrefix("property:");
+    const properties = await mongodb.getAllProperties();
     return c.json({ success: true, data: properties || [] });
   } catch (error) {
     console.log("Error fetching properties:", error);
@@ -41,7 +42,7 @@ app.get("/make-server-4868b0da/properties", async (c) => {
 app.get("/make-server-4868b0da/properties/:id", async (c) => {
   try {
     const id = c.req.param("id");
-    const property = await kv.get(`property:${id}`);
+    const property = await mongodb.getProperty(id);
 
     if (!property) {
       return c.json({ success: false, error: "Property not found" }, 404);
@@ -58,20 +59,8 @@ app.get("/make-server-4868b0da/properties/:id", async (c) => {
 app.post("/make-server-4868b0da/properties", async (c) => {
   try {
     const body = await c.req.json();
-
-    // Get current counter and increment
-    let counter = await kv.get("counter:properties");
-    const newId = (counter || 0) + 1;
-    await kv.set("counter:properties", newId);
-
-    const property = {
-      id: String(newId),
-      ...body,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    await kv.set(`property:${newId}`, property);
+    const id = await mongodb.createProperty(body);
+    const property = await mongodb.getProperty(id.toString());
     return c.json({ success: true, data: property }, 201);
   } catch (error) {
     console.log("Error creating property:", error);
@@ -85,20 +74,18 @@ app.put("/make-server-4868b0da/properties/:id", async (c) => {
     const id = c.req.param("id");
     const body = await c.req.json();
 
-    const existing = await kv.get(`property:${id}`);
+    const existing = await mongodb.getProperty(id);
     if (!existing) {
       return c.json({ success: false, error: "Property not found" }, 404);
     }
 
-    const updated = {
-      ...existing,
-      ...body,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = await mongodb.updateProperty(id, body);
+    if (!updated) {
+      return c.json({ success: false, error: "Failed to update property" }, 500);
+    }
 
-    await kv.set(`property:${id}`, updated);
-    return c.json({ success: true, data: updated });
+    const property = await mongodb.getProperty(id);
+    return c.json({ success: true, data: property });
   } catch (error) {
     console.log("Error updating property:", error);
     return c.json({ success: false, error: String(error) }, 500);
@@ -110,12 +97,16 @@ app.delete("/make-server-4868b0da/properties/:id", async (c) => {
   try {
     const id = c.req.param("id");
 
-    const existing = await kv.get(`property:${id}`);
+    const existing = await mongodb.getProperty(id);
     if (!existing) {
       return c.json({ success: false, error: "Property not found" }, 404);
     }
 
-    await kv.del(`property:${id}`);
+    const deleted = await mongodb.deleteProperty(id);
+    if (!deleted) {
+      return c.json({ success: false, error: "Failed to delete property" }, 500);
+    }
+
     return c.json({ success: true, message: "Property deleted" });
   } catch (error) {
     console.log("Error deleting property:", error);
@@ -128,7 +119,7 @@ app.delete("/make-server-4868b0da/properties/:id", async (c) => {
 // Get all leads
 app.get("/make-server-4868b0da/leads", async (c) => {
   try {
-    const leads = await kv.getByPrefix("lead:");
+    const leads = await mongodb.getAllLeads();
     return c.json({ success: true, data: leads || [] });
   } catch (error) {
     console.log("Error fetching leads:", error);
@@ -140,19 +131,9 @@ app.get("/make-server-4868b0da/leads", async (c) => {
 app.post("/make-server-4868b0da/leads", async (c) => {
   try {
     const body = await c.req.json();
-
-    // Get current counter and increment
-    let counter = await kv.get("counter:leads");
-    const newId = (counter || 0) + 1;
-    await kv.set("counter:leads", newId);
-
-    const lead = {
-      id: String(newId),
-      ...body,
-      createdAt: new Date().toISOString(),
-    };
-
-    await kv.set(`lead:${newId}`, lead);
+    const id = await mongodb.createLead(body);
+    const leadCollection = await mongodb.getLeadsCollection();
+    const lead = await leadCollection.findOne({ _id: id });
     return c.json({ success: true, data: lead }, 201);
   } catch (error) {
     console.log("Error creating lead:", error);
