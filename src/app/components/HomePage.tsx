@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import {
   ArrowRight,
   CheckCircle,
@@ -8,29 +9,26 @@ import {
   MessageCircle,
   Shield,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { PropertyCard } from './PropertyCard';
-import { ImageWithFallback } from './figma/ImageWithFallback';
-import { propertyAPI } from '../../utils/api';
-import { initializeSampleData } from '../../utils/sampleData';
+import { ImageWithFallback } from './ImageWithFallback';
+import { propertyAPI, leadAPI, errorMessage, type Property } from '../../utils/api';
+import { site, whatsappUrl } from '../../config/site';
+
+const emptyEnquiry = { name: '', phone: '', email: '', preferredLocation: '', message: '', website: '' };
+
+const HERO_IMAGE = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef';
 
 export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => void }) {
-  const [featuredProperties, setFeaturedProperties] = useState<any[]>([]);
+  const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enquiry, setEnquiry] = useState(emptyEnquiry);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    initializeAndLoadProperties();
+    loadProperties();
   }, []);
-
-  const initializeAndLoadProperties = async () => {
-    try {
-      await initializeSampleData();
-      await loadProperties();
-    } catch (error) {
-      console.error('Failed to initialize:', error);
-      setLoading(false);
-    }
-  };
 
   const loadProperties = async () => {
     try {
@@ -43,6 +41,27 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
     }
   };
 
+  const handleEnquiry = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await leadAPI.create(enquiry);
+      toast.success('Thank you! We have received your inquiry and will call you shortly.');
+      setEnquiry(emptyEnquiry);
+    } catch (error) {
+      console.error('Failed to submit inquiry:', error);
+      toast.error(errorMessage(error, 'Failed to submit inquiry. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleWhatsApp = () => {
+    const location = enquiry.preferredLocation ? ` in ${enquiry.preferredLocation}` : '';
+    window.open(whatsappUrl(`Hello, I am interested in buying land${location}.`), '_blank', 'noopener');
+  };
+
   const trustIndicators = [
     { icon: Shield, title: 'Verified Properties', description: 'Legally checked land with clear documents.' },
     { icon: Lock, title: 'Secure Transactions', description: 'Transparent process from inquiry to transfer.' },
@@ -50,18 +69,7 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
     { icon: MapPin, title: 'Prime Locations', description: 'High-growth areas across Kenya.' },
   ];
 
-  const testimonials = [
-    {
-      name: 'James Mwangi',
-      role: 'Happy Investor',
-      content: 'Shabach Properties made the process so easy and transparent. I got my dream plot at a great price.',
-    },
-    {
-      name: 'Mary Wanjiku',
-      role: 'Property Owner',
-      content: 'The team explained every step clearly and arranged a site visit quickly. I felt confident buying.',
-    },
-  ];
+  const { testimonials } = site;
 
   const fieldClass =
     'w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#2DB34A] focus:ring-2 focus:ring-[#2DB34A]/15';
@@ -70,7 +78,9 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
     <div id="home" className="min-h-screen bg-white">
       <section className="relative overflow-hidden border-b border-gray-200 bg-[#F7FAF6]">
         <ImageWithFallback
-          src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800"
+          src={`${HERO_IMAGE}?w=1800`}
+          srcSet={`${HERO_IMAGE}?w=800 800w, ${HERO_IMAGE}?w=1200 1200w, ${HERO_IMAGE}?w=1800 1800w`}
+          sizes="100vw"
           alt="Green land parcels"
           className="absolute inset-0 h-full w-full object-cover"
         />
@@ -89,13 +99,11 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
               Prime, affordable and secure land for your future. Invest today, build tomorrow.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button
-                size="lg"
-                className="rounded-md bg-[#2DB34A] px-8 hover:bg-[#23923B]"
-                onClick={() => document.getElementById('properties')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                View Properties
-                <ArrowRight className="ml-2 h-5 w-5" />
+              <Button asChild size="lg" className="rounded-md bg-[#2DB34A] px-8 hover:bg-[#23923B]">
+                <Link to="/properties">
+                  View Properties
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
               <Button
                 size="lg"
@@ -117,41 +125,91 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
             </div>
           </div>
 
-          <div id="contact" className="rounded-lg border border-gray-200 bg-white p-6 shadow-2xl">
+          <div id="contact" className="scroll-mt-24 rounded-lg border border-gray-200 bg-white p-6 shadow-2xl">
             <h2 className="text-xl font-bold text-[#111827]">Enquire About Land</h2>
             <p className="mt-1 text-sm text-gray-500">Get in touch with us</p>
-            <form
-              className="mt-5 space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-              }}
-            >
-              <input className={fieldClass} type="text" placeholder="Full Name" />
-              <input className={fieldClass} type="tel" placeholder="Phone Number" />
-              <input className={fieldClass} type="email" placeholder="Email Address" />
-              <select className={fieldClass} defaultValue="">
-                <option value="" disabled>
-                  Preferred Location
-                </option>
+            <form className="mt-5 space-y-3" onSubmit={handleEnquiry}>
+              {/* Hidden from people; bots that fill it in are ignored */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="hidden"
+                value={enquiry.website}
+                onChange={(e) => setEnquiry({ ...enquiry, website: e.target.value })}
+              />
+              <input
+                className={fieldClass}
+                type="text"
+                required
+                aria-label="Full Name"
+                placeholder="Full Name"
+                value={enquiry.name}
+                onChange={(e) => setEnquiry({ ...enquiry, name: e.target.value })}
+              />
+              <input
+                className={fieldClass}
+                type="tel"
+                required
+                aria-label="Phone Number"
+                placeholder="Phone Number"
+                value={enquiry.phone}
+                onChange={(e) => setEnquiry({ ...enquiry, phone: e.target.value })}
+              />
+              <input
+                className={fieldClass}
+                type="email"
+                aria-label="Email Address"
+                placeholder="Email Address (optional)"
+                value={enquiry.email}
+                onChange={(e) => setEnquiry({ ...enquiry, email: e.target.value })}
+              />
+              <select
+                className={fieldClass}
+                aria-label="Preferred Location"
+                value={enquiry.preferredLocation}
+                onChange={(e) => setEnquiry({ ...enquiry, preferredLocation: e.target.value })}
+              >
+                <option value="">Preferred Location</option>
                 <option>Kitengela</option>
                 <option>Kamulu</option>
                 <option>Ngong</option>
                 <option>Juja</option>
               </select>
-              <textarea className={fieldClass} rows={4} placeholder="Message (optional)" />
-              <Button type="submit" className="w-full rounded-md bg-[#2DB34A] hover:bg-[#23923B]">
-                Send Inquiry
+              <textarea
+                className={fieldClass}
+                rows={4}
+                aria-label="Message"
+                placeholder="Message (optional)"
+                value={enquiry.message}
+                onChange={(e) => setEnquiry({ ...enquiry, message: e.target.value })}
+              />
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-md bg-[#2DB34A] hover:bg-[#23923B]"
+              >
+                {submitting ? 'Sending...' : 'Send Inquiry'}
               </Button>
-              <Button type="button" className="w-full rounded-md bg-[#5E2CA5] hover:bg-[#4C2388]">
+              <Button
+                type="button"
+                onClick={handleWhatsApp}
+                className="w-full rounded-md bg-[#5E2CA5] hover:bg-[#4C2388]"
+              >
                 <MessageCircle className="mr-2 h-4 w-4" />
                 Chat on WhatsApp
               </Button>
+              <p className="text-xs text-gray-500">
+                We only use your details to contact you about this inquiry.
+              </p>
             </form>
           </div>
         </div>
       </section>
 
-      <section id="properties" className="bg-white py-16">
+      <section id="properties" className="scroll-mt-20 bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 lg:px-6">
           <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
@@ -161,8 +219,8 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
                 Residential, commercial and agricultural plots in high-growth locations.
               </p>
             </div>
-            <Button variant="ghost" className="w-fit text-[#5E2CA5] hover:bg-[#5E2CA5]/5 hover:text-[#3F1E72]">
-              View All Properties
+            <Button asChild variant="ghost" className="w-fit text-[#5E2CA5] hover:bg-[#5E2CA5]/5 hover:text-[#3F1E72]">
+              <Link to="/properties">View All Properties</Link>
             </Button>
           </div>
 
@@ -189,7 +247,17 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
         </div>
       </section>
 
-      <section id="why-choose-us" className="border-y border-gray-200 bg-[#F8FAFC] py-12">
+      <section id="about" className="scroll-mt-20 border-t border-gray-200 bg-white py-12">
+        <div className="mx-auto max-w-3xl px-4 text-center lg:px-6">
+          <p className="text-sm font-bold uppercase tracking-wide text-[#5E2CA5]">About Us</p>
+          <h2 className="mt-2 text-3xl font-extrabold text-[#111827]">Shabach Properties Ltd</h2>
+          <p className="mt-4 text-lg leading-8 text-gray-600">
+            We deal in selling prime and affordable land. Our mission is to help you invest wisely and own land with confidence.
+          </p>
+        </div>
+      </section>
+
+      <section id="why-choose-us" className="scroll-mt-20 border-y border-gray-200 bg-[#F8FAFC] py-12">
         <div className="mx-auto max-w-7xl px-4 lg:px-6">
           <h2 className="mb-8 text-center text-2xl font-extrabold text-[#5E2CA5]">
             Why Choose Shabach Properties Ltd?
@@ -211,18 +279,20 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
       </section>
 
       <section className="bg-white py-16">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 lg:grid-cols-[1fr_1fr] lg:px-6">
+        <div
+          className={`mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 lg:px-6 ${
+            testimonials.length > 0 ? 'lg:grid-cols-[1fr_1fr]' : ''
+          }`}
+        >
           <div className="rounded-lg bg-[#5E2CA5] p-10 text-white shadow-lg">
             <h2 className="text-3xl font-bold">Ready to own a piece of land?</h2>
             <p className="mt-3 text-lg text-white/90">Let us help you find the perfect one.</p>
-            <Button
-              className="mt-8 rounded-md bg-[#2DB34A] px-8 hover:bg-[#23923B]"
-              onClick={() => document.getElementById('properties')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              Browse All Properties
+            <Button asChild className="mt-8 rounded-md bg-[#2DB34A] px-8 hover:bg-[#23923B]">
+              <Link to="/properties">Browse All Properties</Link>
             </Button>
           </div>
 
+          {testimonials.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-white p-10 shadow-sm">
             <p className="text-sm font-bold uppercase tracking-wide text-[#5E2CA5]">What Our Clients Say</p>
             <div className="mt-6 grid gap-6">
@@ -237,6 +307,7 @@ export function HomePage({ onViewProperty }: { onViewProperty: (id: string) => v
               ))}
             </div>
           </div>
+          )}
         </div>
       </section>
     </div>

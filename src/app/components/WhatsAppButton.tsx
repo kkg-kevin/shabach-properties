@@ -1,18 +1,15 @@
 import { MessageCircle } from 'lucide-react';
+import { whatsappUrl } from '../../config/site';
 
 interface WhatsAppButtonProps {
-  phoneNumber?: string;
   message?: string;
 }
 
 export function WhatsAppButton({
-  phoneNumber = '254700000000',
   message = 'Hello, I am interested in learning more about your properties.',
 }: WhatsAppButtonProps) {
   const handleClick = () => {
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(whatsappUrl(message), '_blank', 'noopener');
   };
 
   return (
