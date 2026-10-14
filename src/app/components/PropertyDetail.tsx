@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, MapPin, Home, CheckCircle, Calendar, Phone, Mail, User, MessageSquare } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ImageWithFallback } from './figma/ImageWithFallback';
-import { propertyAPI, leadAPI } from '../../utils/api';
+import { ImageWithFallback } from './ImageWithFallback';
+import { propertyAPI, leadAPI, errorMessage, type Property } from '../../utils/api';
+import { site, whatsappUrl } from '../../config/site';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { toast } from 'sonner';
 
 interface PropertyDetailProps {
@@ -12,7 +14,7 @@ interface PropertyDetailProps {
 }
 
 export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
-  const [property, setProperty] = useState<any>(null);
+  const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [formData, setFormData] = useState({
@@ -20,8 +22,11 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
     phone: '',
     email: '',
     message: '',
+    website: '',
   });
   const [submitting, setSubmitting] = useState(false);
+
+  usePageTitle(property ? `${property.title} in ${property.location}` : undefined);
 
   useEffect(() => {
     loadProperty();
@@ -30,11 +35,12 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
   const loadProperty = async () => {
     try {
       setLoading(true);
+      setSelectedImage(0);
       const data = await propertyAPI.getById(propertyId);
       setProperty(data);
     } catch (error) {
       console.error('Failed to load property:', error);
-      toast.error('Failed to load property details');
+      setProperty(null);
     } finally {
       setLoading(false);
     }
@@ -51,10 +57,10 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
         propertyTitle: property?.title,
       });
       toast.success('Your inquiry has been submitted successfully!');
-      setFormData({ name: '', phone: '', email: '', message: '' });
+      setFormData({ name: '', phone: '', email: '', message: '', website: '' });
     } catch (error) {
       console.error('Failed to submit inquiry:', error);
-      toast.error('Failed to submit inquiry. Please try again.');
+      toast.error(errorMessage(error, 'Failed to submit inquiry. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -62,8 +68,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
 
   const handleWhatsApp = () => {
     const message = `Hello, I am interested in ${property?.title} located in ${property?.location}. Price: KSh ${property?.price}`;
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/254700000000?text=${encodedMessage}`, '_blank');
+    window.open(whatsappUrl(message), '_blank', 'noopener');
   };
 
   if (loading) {
@@ -95,7 +100,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
     ? property.images
     : ['https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200'];
 
-  const features = property.features || [
+  const features = property.features?.length ? property.features : [
     'Clear Title Deed',
     'Road Access',
     'Water Available',
@@ -106,7 +111,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b sticky top-20 z-10">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" onClick={onBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
@@ -144,6 +149,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                         <ImageWithFallback
                           src={img}
                           alt={`${property.title} ${index + 1}`}
+                          loading="lazy"
                           className="w-full h-full object-cover"
                         />
                       </button>
@@ -223,17 +229,17 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                 <CardTitle>Location</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="aspect-video bg-gradient-to-br from-[#2DB34A]/10 to-[#1E3A8A]/10 rounded-lg overflow-hidden flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <MapPin className="w-16 h-16 text-[#2DB34A] mx-auto mb-4" />
-                    <h4 className="text-xl font-semibold mb-2">{property.location}</h4>
-                    <p className="text-gray-600">
-                      Exact location coordinates will be shared during your site visit
-                    </p>
-                  </div>
+                <div className="aspect-video overflow-hidden rounded-lg bg-gray-100">
+                  <iframe
+                    title={`Map of ${property.location}`}
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(`${property.location}, Kenya`)}&output=embed`}
+                    className="h-full w-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
                 </div>
-                <p className="text-sm text-gray-500 mt-4 italic">
-                  To enable interactive maps, configure your Google Maps API key in the settings
+                <p className="text-sm text-gray-500 mt-4">
+                  Map shows the general area. Exact location will be shared during your site visit.
                 </p>
               </CardContent>
             </Card>
@@ -242,7 +248,7 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Price Card */}
-            <Card className="sticky top-24">
+            <Card>
               <CardContent className="p-6 space-y-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Price</p>
@@ -272,11 +278,11 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Phone className="w-4 h-4" />
-                      <span>+254 700 000 000</span>
+                      <a href={site.phoneHref} className="hover:text-[#2DB34A]">{site.phoneDisplay}</a>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail className="w-4 h-4" />
-                      <span>info@shabachproperties.co.ke</span>
+                      <a href={`mailto:${site.email}`} className="hover:text-[#2DB34A]">{site.email}</a>
                     </div>
                   </div>
                 </div>
@@ -284,12 +290,23 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
             </Card>
 
             {/* Inquiry Form */}
-            <Card id="inquiry-form">
+            <Card id="inquiry-form" className="scroll-mt-40">
               <CardHeader>
                 <CardTitle>Send Inquiry</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Hidden from people; bots that fill it in are ignored */}
+                  <input
+                    type="text"
+                    name="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    className="hidden"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  />
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       <User className="w-4 h-4 inline mr-1" />
@@ -316,18 +333,17 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2DB34A]/20 focus:border-[#2DB34A] outline-none"
-                      placeholder="+254 700 000 000"
+                      placeholder="07XX XXX XXX"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       <Mail className="w-4 h-4 inline mr-1" />
-                      Email Address
+                      Email Address (optional)
                     </label>
                     <input
                       type="email"
-                      required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2DB34A]/20 focus:border-[#2DB34A] outline-none"
@@ -355,6 +371,9 @@ export function PropertyDetail({ propertyId, onBack }: PropertyDetailProps) {
                   >
                     {submitting ? 'Sending...' : 'Send Inquiry'}
                   </Button>
+                  <p className="text-xs text-gray-500">
+                    We only use your details to contact you about this inquiry.
+                  </p>
                 </form>
               </CardContent>
             </Card>

@@ -1,4 +1,5 @@
 export type PropertyStatus = 'Available' | 'Sold';
+export type LeadStatus = 'New' | 'Contacted' | 'Closed';
 
 export interface Property {
   id: string;
@@ -17,95 +18,111 @@ export interface Lead {
   id: string;
   name: string;
   phone: string;
-  email: string;
+  email?: string;
   message?: string;
+  preferredLocation?: string;
   propertyId?: string;
   propertyTitle?: string;
+  status?: LeadStatus;
   createdAt: string;
 }
 
-type NewProperty = Omit<Property, 'id' | 'createdAt'>;
-type NewLead = Omit<Lead, 'id' | 'createdAt'>;
+export type NewProperty = Omit<Property, 'id' | 'createdAt'>;
+// `website` is the hidden anti-spam field; real visitors leave it empty
+type NewLead = Omit<Lead, 'id' | 'createdAt' | 'status'> & { website?: string };
 
-const PROPERTIES_KEY = 'shabach-properties';
-const LEADS_KEY = 'shabach-leads';
-
-function readList<T>(key: string): T[] {
-  const value = localStorage.getItem(key);
-
-  if (!value) {
-    return [];
-  }
-
-  try {
-    return JSON.parse(value) as T[];
-  } catch {
-    localStorage.removeItem(key);
-    return [];
+class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
   }
 }
 
-function writeList<T>(key: string, items: T[]) {
-  localStorage.setItem(key, JSON.stringify(items));
+async function request<T>(path: string, method = 'GET', payload?: unknown): Promise<T> {
+  const isFile = payload instanceof Blob;
+  const response = await fetch(`/api${path}`, {
+    method,
+    credentials: 'same-origin',
+    headers:
+      payload === undefined
+        ? undefined
+        : { 'Content-Type': isFile ? 'application/octet-stream' : 'application/json' },
+    body: payload === undefined ? undefined : isFile ? payload : JSON.stringify(payload),
+  });
+
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.success) {
+    throw new ApiError(response.status, result?.error || 'Something went wrong. Please try again.');
+  }
+  return result.data as T;
 }
 
-function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+export function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+export function isSignedOut(error: unknown) {
+  return error instanceof ApiError && error.status === 401;
+}
+
+// "1,500,000" -> 1500000, for sorting
+export function priceValue(price: string) {
+  return Number(price.replace(/[^\d.]/g, '')) || 0;
 }
 
 export const propertyAPI = {
-  async getAll() {
-    return readList<Property>(PROPERTIES_KEY).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  },
-
-  async getById(id: string) {
-    return readList<Property>(PROPERTIES_KEY).find((property) => property.id === id) ?? null;
-  },
-
-  async create(property: NewProperty) {
-    const properties = readList<Property>(PROPERTIES_KEY);
-    const newProperty: Property = {
-      ...property,
-      id: createId('property'),
-      createdAt: new Date().toISOString(),
-    };
-
-    writeList(PROPERTIES_KEY, [newProperty, ...properties]);
-    return newProperty;
-  },
-
-  async delete(id: string) {
-    const properties = readList<Property>(PROPERTIES_KEY);
-    writeList(
-      PROPERTIES_KEY,
-      properties.filter((property) => property.id !== id),
-    );
-  },
+  getAll: () => request<Property[]>('/properties'),
+  getById: (id: string) => request<Property>(`/properties/${encodeURIComponent(id)}`),
+  create: (property: NewProperty) => request<Property>('/properties', 'POST', property),
+  update: (id: string, property: NewProperty) =>
+    request<Property>(`/properties/${encodeURIComponent(id)}`, 'PUT', property),
+  delete: (id: string) => request<null>(`/properties/${encodeURIComponent(id)}`, 'DELETE'),
 };
 
 export const leadAPI = {
-  async getAll() {
-    return readList<Lead>(LEADS_KEY).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  },
-
-  async create(lead: NewLead) {
-    const leads = readList<Lead>(LEADS_KEY);
-    const newLead: Lead = {
-      ...lead,
-      id: createId('lead'),
-      createdAt: new Date().toISOString(),
-    };
-
-    writeList(LEADS_KEY, [newLead, ...leads]);
-    return newLead;
-  },
+  getAll: () => request<Lead[]>('/leads'),
+  create: (lead: NewLead) => request<{ id: string }>('/leads', 'POST', lead),
+  setStatus: (id: string, status: LeadStatus) =>
+    request<Lead>(`/leads/${encodeURIComponent(id)}`, 'PATCH', { status }),
+  delete: (id: string) => request<null>(`/leads/${encodeURIComponent(id)}`, 'DELETE'),
 };
 
-export const storageKeys = {
-  leads: LEADS_KEY,
-  properties: PROPERTIES_KEY,
+export const authAPI = {
+  check: () => request<{ authenticated: boolean }>('/auth').then((result) => result.authenticated),
+  login: (password: string) => request<{ authenticated: boolean }>('/auth', 'POST', { password }),
+  logout: () => request<{ authenticated: boolean }>('/auth', 'DELETE'),
+};
+
+const MAX_IMAGE_SIDE = 1600;
+
+// Shrinks a photo in the browser so phone pictures upload quickly
+async function toJpeg(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file).catch(() => {
+    throw new Error(`${file.name} is not an image this browser can read`);
+  });
+  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+
+  const context = canvas.getContext('2d')!;
+  // JPEG has no transparency
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error(`Could not process ${file.name}`))),
+      'image/jpeg',
+      0.82,
+    );
+  });
+}
+
+export const imageAPI = {
+  upload: async (file: File) => {
+    const { url } = await request<{ url: string }>('/images', 'POST', await toJpeg(file));
+    return url;
+  },
 };

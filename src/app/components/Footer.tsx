@@ -1,4 +1,20 @@
+import { Link } from 'react-router';
 import { Facebook, Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
+import { site } from '../../config/site';
+
+const quickLinks = [
+  { name: 'Home', href: '/#home' },
+  { name: 'Properties', href: '/properties' },
+  { name: 'About Us', href: '/#about' },
+  { name: 'Why Choose Us', href: '/#why-choose-us' },
+  { name: 'Contact Us', href: '/#contact' },
+];
+
+const socialLinks = [
+  { name: 'Facebook', href: site.social.facebook, icon: Facebook, className: 'bg-[#1E3A8A] hover:bg-[#172E70]' },
+  { name: 'Instagram', href: site.social.instagram, icon: Instagram, className: 'bg-[#F59E0B] hover:bg-[#D88707]' },
+  { name: 'LinkedIn', href: site.social.linkedin, icon: Linkedin, className: 'bg-[#2DB34A] hover:bg-[#23923B]' },
+].filter((link) => link.href);
 
 export function Footer() {
   return (
@@ -10,27 +26,32 @@ export function Footer() {
             <p className="mt-4 text-sm leading-6 text-gray-600">
               We deal in selling prime and affordable land. Our mission is to help you invest wisely and own land with confidence.
             </p>
-            <div className="mt-5 flex gap-3">
-              <a href="#" className="rounded-full bg-[#1E3A8A] p-2 text-white transition-colors hover:bg-[#172E70]">
-                <Facebook className="h-4 w-4" />
-              </a>
-              <a href="#" className="rounded-full bg-[#F59E0B] p-2 text-white transition-colors hover:bg-[#D88707]">
-                <Instagram className="h-4 w-4" />
-              </a>
-              <a href="#" className="rounded-full bg-[#2DB34A] p-2 text-white transition-colors hover:bg-[#23923B]">
-                <Linkedin className="h-4 w-4" />
-              </a>
-            </div>
+            {socialLinks.length > 0 && (
+              <div className="mt-5 flex gap-3">
+                {socialLinks.map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={link.name}
+                    className={`rounded-full p-2 text-white transition-colors ${link.className}`}
+                  >
+                    <link.icon className="h-4 w-4" />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
             <h4 className="text-sm font-extrabold uppercase text-[#5E2CA5]">Quick Links</h4>
             <ul className="mt-4 space-y-2 text-sm">
-              {['Home', 'Properties', 'About Us', 'Why Choose Us', 'Contact Us'].map((item) => (
-                <li key={item}>
-                  <a href="#" className="text-gray-600 transition-colors hover:text-[#2DB34A]">
-                    {item}
-                  </a>
+              {quickLinks.map((item) => (
+                <li key={item.name}>
+                  <Link to={item.href} className="text-gray-600 transition-colors hover:text-[#2DB34A]">
+                    {item.name}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -51,15 +72,15 @@ export function Footer() {
             <ul className="mt-4 space-y-3 text-sm">
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#2DB34A]" />
-                <span className="text-gray-600">Nairobi, Kenya</span>
+                <span className="text-gray-600">{site.address}</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4 shrink-0 text-[#2DB34A]" />
-                <span className="text-gray-600">+254 700 000 000</span>
+                <a href={site.phoneHref} className="text-gray-600 hover:text-[#2DB34A]">{site.phoneDisplay}</a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4 shrink-0 text-[#2DB34A]" />
-                <span className="text-gray-600">info@shabachproperties.co.ke</span>
+                <a href={`mailto:${site.email}`} className="text-gray-600 hover:text-[#2DB34A]">{site.email}</a>
               </li>
             </ul>
           </div>

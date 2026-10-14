@@ -1,7 +1,6 @@
 import { Home, MapPin } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
-import { Button } from './ui/button';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 
 interface PropertyCardProps {
   id: string;
@@ -26,11 +25,15 @@ export function PropertyCard({
   const imageUrl = images?.[0] || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800';
 
   return (
-    <Card className="group cursor-pointer overflow-hidden rounded-lg border-gray-200 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <Card
+      onClick={onClick}
+      className="group cursor-pointer overflow-hidden rounded-lg border-gray-200 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+    >
       <div className="relative aspect-[4/3] overflow-hidden">
         <ImageWithFallback
           src={imageUrl}
           alt={title}
+          loading="lazy"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute left-3 top-3">
@@ -66,13 +69,13 @@ export function PropertyCard({
             <p className="text-xs text-gray-500">Price</p>
             <p className="text-xl font-bold text-[#16872E]">KSh {price}</p>
           </div>
-          <Button
-            onClick={onClick}
-            variant="ghost"
-            className="h-auto px-0 py-0 text-sm font-bold text-[#5E2CA5] hover:bg-transparent hover:text-[#3F1E72]"
+          {/* The whole card is clickable; this button keeps it reachable by keyboard */}
+          <button
+            type="button"
+            className="text-sm font-bold text-[#5E2CA5] hover:text-[#3F1E72]"
           >
             View Details
-          </Button>
+          </button>
         </div>
       </CardContent>
     </Card>
