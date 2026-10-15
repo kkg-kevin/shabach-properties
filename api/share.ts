@@ -1,8 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { formatPrice } from './_lib/properties.js';
 import { getProperty, isId } from './_lib/store.js';
 
 // Link-preview page for a property. vercel.json sends WhatsApp, Facebook and
 // similar preview bots here; real visitors always get the normal site.
+
+// Same picture as the home page's og:image, used when there is no property photo
+const SITE_IMAGE = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=630&fit=crop';
 
 function escapeHtml(value: string) {
   return value
@@ -16,16 +20,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const origin = `https://${req.headers.host}`;
   let title = 'Shabach Properties Ltd | Prime & Affordable Land for Sale in Kenya';
   let description = 'Prime, affordable and verified land in Kenya. Browse available plots and book a site visit.';
-  let image = '';
+  let image = SITE_IMAGE;
   let url = `${origin}/properties`;
 
   try {
     const { id } = req.query;
     const property = isId(id) ? await getProperty(id) : null;
-    if (property) {
-      title = `${property.title} - KSh ${property.price} | Shabach Properties`;
+    if (property && property.status !== 'Hidden') {
+      title = `${property.title} - ${formatPrice(property.price)} | Shabach Properties`;
       description = [property.location, property.size, property.description].filter(Boolean).join(' · ').slice(0, 300);
       url = `${origin}/properties/${id}`;
+      // A property without photos gets a text-only preview rather than a stock photo
       image = property.images[0] ?? '';
     }
   } catch (error) {

@@ -43,8 +43,7 @@ Thumbs.db
 *.temp
 desktop.ini
 
-# Vercel
-.vercel
-
+# Vercel (the Vercel CLI adds the two lines below; the template must stay committed)
 .vercel
 .env*
+!.env.example

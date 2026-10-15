@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { LeadInput, PropertyInput } from '../api/_lib/store';
+import type { LeadChanges, LeadInput, PropertyInput } from '../api/_lib/store';
 
 // In-memory stand-in for api/_lib/store.ts, so the API can be tested without Supabase
 
@@ -23,8 +23,8 @@ export function isId(value: unknown): value is string {
   return typeof value === 'string' && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value);
 }
 
-export async function listProperties() {
-  return [...data.properties].reverse();
+export async function listProperties(includeHidden = false) {
+  return [...data.properties].reverse().filter((property) => includeHidden || property.status !== 'Hidden');
 }
 
 export async function getProperty(id: string) {
@@ -55,15 +55,15 @@ export async function listLeads() {
 }
 
 export async function createLead(input: LeadInput) {
-  const lead = { id: randomUUID(), ...input, status: 'New', createdAt: new Date().toISOString() };
+  const lead = { id: randomUUID(), ...input, notes: '', status: 'New', createdAt: new Date().toISOString() };
   data.leads.push(lead);
   return lead.id;
 }
 
-export async function setLeadStatus(id: string, status: string) {
+export async function updateLead(id: string, changes: LeadChanges) {
   const lead = data.leads.find((candidate) => candidate.id === id);
   if (!lead) return null;
-  lead.status = status;
+  Object.assign(lead, changes);
   return lead;
 }
 
@@ -81,12 +81,15 @@ export async function recordHit(key: string) {
   data.hits.push({ key, createdAt: new Date() });
 }
 
-export async function saveImage(_data: Buffer) {
-  const url = `${IMAGE_PREFIX}${randomUUID()}.jpg`;
+export async function saveImage(_data: Buffer, name = `${randomUUID()}.jpg`) {
+  const url = `${IMAGE_PREFIX}${name}`;
   data.images.add(url);
   return url;
 }
 
 export async function deleteImages(urls: string[]) {
-  urls.forEach((url) => data.images.delete(url));
+  urls.forEach((url) => {
+    data.images.delete(url);
+    data.images.delete(url.replace(/\.jpg$/, '-thumb.jpg'));
+  });
 }

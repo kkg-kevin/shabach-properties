@@ -1,10 +1,11 @@
 import { HttpError, requireAdmin, route } from '../_lib/http.js';
-import { saveImage } from '../_lib/store.js';
+import { isId, saveImage } from '../_lib/store.js';
 
 const MAX_BYTES = 3 * 1024 * 1024;
 
 export default route({
-  // Body is the raw JPEG, sent as application/octet-stream
+  // Body is the raw JPEG, sent as application/octet-stream.
+  // ?thumbOf=<photo id> stores it as the small version of a photo uploaded just before.
   POST: async (req) => {
     requireAdmin(req);
 
@@ -19,6 +20,10 @@ export default route({
       throw new HttpError(400, 'Image must be a JPEG');
     }
 
-    return { url: await saveImage(data) };
+    const { thumbOf } = req.query;
+    if (thumbOf !== undefined && !isId(thumbOf)) {
+      throw new HttpError(400, 'Unknown photo');
+    }
+    return { url: await saveImage(data, thumbOf ? `${thumbOf}-thumb.jpg` : undefined) };
   },
 });

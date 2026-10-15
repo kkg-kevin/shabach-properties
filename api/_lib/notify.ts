@@ -5,6 +5,7 @@ interface LeadEmail {
   message: string;
   preferredLocation: string;
   propertyTitle: string;
+  visitDate: string;
 }
 
 // Emails the team about a new lead. Does nothing unless RESEND_API_KEY and
@@ -20,6 +21,7 @@ export async function notifyNewLead(lead: LeadEmail) {
     lead.email && `Email: ${lead.email}`,
     lead.propertyTitle && `Property: ${lead.propertyTitle}`,
     lead.preferredLocation && `Preferred location: ${lead.preferredLocation}`,
+    lead.visitDate && `Preferred site visit date: ${lead.visitDate}`,
     lead.message && `\nMessage:\n${lead.message}`,
   ].filter(Boolean);
 
