@@ -140,7 +140,8 @@ export function EnquiryForm({
     return (
       <div role="status" className="space-y-4 text-center">
         <CheckCircle className="mx-auto h-12 w-12 text-brand-green" />
-        <h3 ref={thanksRef} tabIndex={-1} className="text-xl font-bold text-ink outline-none">
+        {/* Same id as the form heading, so a dialog around the form stays labelled */}
+        <h3 ref={thanksRef} id={`${idPrefix}-heading`} tabIndex={-1} className="text-xl font-bold text-ink outline-none">
           Thank you, {sent.name.split(/\s+/)[0]}!
         </h3>
         <p className="text-gray-600">
@@ -185,7 +186,9 @@ export function EnquiryForm({
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-ink">{heading}</h2>
+      <h2 id={`${idPrefix}-heading`} className="text-xl font-bold text-ink">
+        {heading}
+      </h2>
       {subheading && <p className="mt-1 text-sm text-gray-600">{subheading}</p>}
 
       <form className="mt-5 space-y-4" onSubmit={handleSubmit} noValidate>
