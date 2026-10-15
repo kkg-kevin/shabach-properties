@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isAdmin } from './auth.js';
 
+// `field` names the form field the error is about, so the page can show it there
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public field?: string) {
     super(message);
   }
 }
@@ -23,12 +24,21 @@ export function route(handlers: Record<string, Handler>) {
       return res.status(req.method === 'POST' ? 201 : 200).json({ success: true, data });
     } catch (error) {
       if (error instanceof HttpError) {
-        return res.status(error.status).json({ success: false, error: error.message });
+        return res.status(error.status).json({ success: false, error: error.message, field: error.field });
       }
       console.error(`${req.method} ${req.url} failed:`, error);
       return res.status(500).json({ success: false, error: 'Something went wrong. Please try again.' });
     }
   };
+}
+
+// Lets Vercel's CDN serve a public response for a minute, then refresh it in the background
+export function cachePublicly(res: VercelResponse) {
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
+}
+
+export function doNotCache(res: VercelResponse) {
+  res.setHeader('Cache-Control', 'private, no-store');
 }
 
 export function requireAdmin(req: VercelRequest) {
@@ -73,4 +83,16 @@ export function textList(value: unknown, field: string, maxItems: number, maxLen
     throw new HttpError(400, `${field} has too many entries`);
   }
   return items;
+}
+
+// Runs a validation step and tags any error it raises with the form field it is about
+export function forField<T>(field: string, read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw new HttpError(error.status, error.message, field);
+    }
+    throw error;
+  }
 }

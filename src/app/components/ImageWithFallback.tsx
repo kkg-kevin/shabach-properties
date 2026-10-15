@@ -1,27 +1,39 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { ImageOff } from 'lucide-react'
 
-const ERROR_IMG_SRC =
-  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg=='
+interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+  // Tried if `src` fails, e.g. the full photo when its thumbnail is missing
+  fallbackSrc?: string
+}
 
-export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElement>) {
-  const [didError, setDidError] = useState(false)
+export function ImageWithFallback({ src, fallbackSrc, alt, className, style, ...rest }: ImageWithFallbackProps) {
+  const [failures, setFailures] = useState(0)
 
-  const handleError = () => {
-    setDidError(true)
+  useEffect(() => setFailures(0), [src])
+
+  const current = failures === 0 ? src : failures === 1 && fallbackSrc ? fallbackSrc : null
+
+  if (!current) {
+    return (
+      <div
+        role="img"
+        aria-label={alt ? `${alt} (photo unavailable)` : 'Photo unavailable'}
+        className={`flex items-center justify-center bg-gray-100 text-gray-400 ${className ?? ''}`}
+        style={style}
+      >
+        <ImageOff className="h-8 w-8" />
+      </div>
+    )
   }
 
-  const { src, alt, style, className, ...rest } = props
-
-  return didError ? (
-    <div
-      className={`inline-block bg-gray-100 text-center align-middle ${className ?? ''}`}
+  return (
+    <img
+      src={current}
+      alt={alt}
+      className={className}
       style={style}
-    >
-      <div className="flex items-center justify-center w-full h-full">
-        <img src={ERROR_IMG_SRC} alt="Error loading image" {...rest} data-original-url={src} />
-      </div>
-    </div>
-  ) : (
-    <img src={src} alt={alt} className={className} style={style} {...rest} onError={handleError} />
+      {...rest}
+      onError={() => setFailures((count) => (fallbackSrc ? count + 1 : 2))}
+    />
   )
 }

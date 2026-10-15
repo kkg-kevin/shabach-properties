@@ -15,6 +15,9 @@ export interface PropertyInput {
   status: string;
   images: string[];
   features: string[];
+  paymentPlan: string;
+  titleStatus: string;
+  mapUrl: string;
 }
 
 export interface LeadInput {
@@ -25,6 +28,12 @@ export interface LeadInput {
   preferredLocation: string;
   propertyId: string;
   propertyTitle: string;
+  visitDate: string;
+}
+
+export interface LeadChanges {
+  status?: string;
+  notes?: string;
 }
 
 let client: SupabaseClient | null = null;
@@ -75,13 +84,37 @@ function toProperty(row: any) {
     status: row.status as string,
     images: (row.images ?? []) as string[],
     features: (row.features ?? []) as string[],
+    paymentPlan: (row.payment_plan ?? '') as string,
+    titleStatus: (row.title_status ?? '') as string,
+    mapUrl: (row.map_url ?? '') as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
 }
 
-export async function listProperties() {
-  const rows = check(await db().from('properties').select('*').order('created_at', { ascending: false }));
+function toPropertyRow(input: PropertyInput) {
+  return {
+    title: input.title,
+    location: input.location,
+    price: input.price,
+    size: input.size,
+    description: input.description,
+    status: input.status,
+    images: input.images,
+    features: input.features,
+    payment_plan: input.paymentPlan,
+    title_status: input.titleStatus,
+    map_url: input.mapUrl,
+  };
+}
+
+// Hidden properties are left out unless the admin asks for them
+export async function listProperties(includeHidden = false) {
+  let query = db().from('properties').select('*');
+  if (!includeHidden) {
+    query = query.neq('status', 'Hidden');
+  }
+  const rows = check(await query.order('created_at', { ascending: false }));
   return (rows ?? []).map(toProperty);
 }
 
@@ -91,14 +124,14 @@ export async function getProperty(id: string) {
 }
 
 export async function createProperty(input: PropertyInput) {
-  return toProperty(check(await db().from('properties').insert(input).select().single()));
+  return toProperty(check(await db().from('properties').insert(toPropertyRow(input)).select().single()));
 }
 
 export async function updateProperty(id: string, input: PropertyInput) {
   const row = check(
     await db()
       .from('properties')
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update({ ...toPropertyRow(input), updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .maybeSingle(),
@@ -123,6 +156,8 @@ function toLead(row: any) {
     preferredLocation: row.preferred_location as string,
     propertyId: row.property_id as string,
     propertyTitle: row.property_title as string,
+    visitDate: (row.visit_date ?? '') as string,
+    notes: (row.notes ?? '') as string,
     status: row.status as string,
     createdAt: row.created_at as string,
   };
@@ -145,6 +180,7 @@ export async function createLead(input: LeadInput) {
         preferred_location: input.preferredLocation,
         property_id: input.propertyId,
         property_title: input.propertyTitle,
+        visit_date: input.visitDate || null,
       })
       .select('id')
       .single(),
@@ -152,11 +188,11 @@ export async function createLead(input: LeadInput) {
   return (row as { id: string }).id;
 }
 
-export async function setLeadStatus(id: string, status: string) {
+export async function updateLead(id: string, changes: LeadChanges) {
   const row = check(
     await db()
       .from('leads')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({ ...changes, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .maybeSingle(),
@@ -201,8 +237,8 @@ function imageUrlPrefix() {
   return `${supabaseUrl()}/storage/v1/object/public/${IMAGE_BUCKET}/`;
 }
 
-export async function saveImage(data: Buffer) {
-  const name = `${randomUUID()}.jpg`;
+// Each photo is stored as <id>.jpg, with a smaller <id>-thumb.jpg for listing cards
+export async function saveImage(data: Buffer, name = `${randomUUID()}.jpg`) {
   const { error } = await db()
     .storage.from(IMAGE_BUCKET)
     // A file never changes once uploaded, so it can be cached for a year
@@ -217,7 +253,10 @@ export async function saveImage(data: Buffer) {
 export async function deleteImages(urls: string[]) {
   try {
     const prefix = imageUrlPrefix();
-    const names = urls.filter((url) => url.startsWith(prefix)).map((url) => url.slice(prefix.length));
+    const names = urls
+      .filter((url) => url.startsWith(prefix))
+      .map((url) => url.slice(prefix.length))
+      .flatMap((name) => [name, name.replace(/\.jpg$/, '-thumb.jpg')]);
     if (names.length === 0) return;
 
     const { error } = await db().storage.from(IMAGE_BUCKET).remove(names);

@@ -6,9 +6,9 @@
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
-  --primary: #2DB34A;
+  --primary: #16872E;
   --primary-foreground: #ffffff;
-  --accent: #F59E0B;
+  --accent: #F3F4F6;
   --accent-foreground: #111827;
   --destructive: #d4183d;
   --border: rgba(0, 0, 0, 0.1);
@@ -16,6 +16,18 @@
   --font-weight-normal: 400;
   --ring: #2DB34A;
   --radius: 0.75rem;
+
+  /* Brand colours. White text needs at least 4.5:1 contrast, so buttons, text
+     and icons use the deeper green; the bright logo green is for borders,
+     focus rings and tints only. */
+  --brand-green: #16872E;
+  --brand-green-hover: #116B24;
+  --brand-green-bright: #2DB34A;
+  --brand-purple: #5E2CA5;
+  --brand-purple-hover: #4C2388;
+  --brand-purple-dark: #3F1E72;
+  --ink: #111827;
+  --tint: #F7FAF6;
 }
 
 @theme inline {
@@ -30,6 +42,14 @@
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-brand-green: var(--brand-green);
+  --color-brand-green-hover: var(--brand-green-hover);
+  --color-brand-green-bright: var(--brand-green-bright);
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-purple-hover: var(--brand-purple-hover);
+  --color-brand-purple-dark: var(--brand-purple-dark);
+  --color-ink: var(--ink);
+  --color-tint: var(--tint);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

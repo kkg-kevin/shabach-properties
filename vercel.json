@@ -3,6 +3,9 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "crons": [
+    { "path": "/api/properties", "schedule": "0 6 * * *" }
+  ],
   "rewrites": [
     {
       "source": "/properties/:id",
@@ -15,6 +18,8 @@
       ],
       "destination": "/api/share?id=:id"
     },
+    { "source": "/robots.txt", "destination": "/api/seo?file=robots" },
+    { "source": "/sitemap.xml", "destination": "/api/seo?file=sitemap" },
     { "source": "/((?!api/|@|src/|node_modules/).*)", "destination": "/index.html" }
   ],
   "headers": [

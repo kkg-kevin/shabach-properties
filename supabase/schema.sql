@@ -1,6 +1,6 @@
 -- Shabach Properties database setup.
 -- Run this once in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
--- It is safe to run again.
+-- It is safe to run again, and running it again brings an older database up to date.
 
 create table if not exists public.properties (
   id uuid primary key default gen_random_uuid(),
@@ -9,9 +9,12 @@ create table if not exists public.properties (
   price text not null,
   size text not null,
   description text not null default '',
-  status text not null default 'Available' check (status in ('Available', 'Sold')),
+  status text not null default 'Available',
   images text[] not null default '{}',
   features text[] not null default '{}',
+  payment_plan text not null default '',
+  title_status text not null default '',
+  map_url text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -25,6 +28,8 @@ create table if not exists public.leads (
   preferred_location text not null default '',
   property_id text not null default '',
   property_title text not null default '',
+  visit_date date,
+  notes text not null default '',
   status text not null default 'New' check (status in ('New', 'Contacted', 'Closed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -35,6 +40,18 @@ create table if not exists public.rate_limits (
   key text not null,
   created_at timestamptz not null default now()
 );
+
+-- Columns added after the first release, for databases created before them
+alter table public.properties add column if not exists payment_plan text not null default '';
+alter table public.properties add column if not exists title_status text not null default '';
+alter table public.properties add column if not exists map_url text not null default '';
+alter table public.leads add column if not exists visit_date date;
+alter table public.leads add column if not exists notes text not null default '';
+
+-- Reserved: under offer. Hidden: kept in the admin but not shown on the site.
+alter table public.properties drop constraint if exists properties_status_check;
+alter table public.properties add constraint properties_status_check
+  check (status in ('Available', 'Reserved', 'Sold', 'Hidden'));
 
 create index if not exists properties_created_at_idx on public.properties (created_at desc);
 create index if not exists leads_created_at_idx on public.leads (created_at desc);

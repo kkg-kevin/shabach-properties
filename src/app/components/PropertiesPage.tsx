@@ -1,40 +1,50 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { Search } from 'lucide-react';
-import { Button } from './ui/button';
-import { PropertyCard } from './PropertyCard';
-import { propertyAPI, priceValue, type Property } from '../../utils/api';
+import { PropertyGrid } from './PropertyCard';
+import { priceValue, type PropertyStatus } from '../../utils/api';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useProperties } from '../../hooks/useProperties';
 
-type StatusFilter = 'All' | 'Available' | 'Sold';
 type SortOrder = 'newest' | 'price-low' | 'price-high';
 
-export function PropertiesPage({ onViewProperty }: { onViewProperty: (id: string) => void }) {
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('All');
-  const [location, setLocation] = useState('');
-  const [sort, setSort] = useState<SortOrder>('newest');
+const STATUSES: PropertyStatus[] = ['Available', 'Reserved', 'Sold'];
+
+const MAX_PRICES = [500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000];
+
+// Plots that can still be bought come before sold ones
+const statusRank: Record<PropertyStatus, number> = { Available: 0, Reserved: 1, Sold: 2, Hidden: 3 };
+
+const fieldClass =
+  'w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-green-bright focus:ring-2 focus:ring-brand-green-bright/20';
+
+export function PropertiesPage() {
+  const { properties, loading, failed, retry } = useProperties();
+  // Filters live in the address, so Back, refresh and shared links keep them
+  const [params, setParams] = useSearchParams();
 
   usePageTitle('Land for Sale');
 
-  useEffect(() => {
-    loadProperties();
-  }, []);
+  const search = params.get('q') ?? '';
+  const location = params.get('location') ?? '';
+  const status = STATUSES.find((value) => value === params.get('status')) ?? '';
+  const maxPrice = Number(params.get('max')) || 0;
+  const sort = (['price-low', 'price-high'].includes(params.get('sort') ?? '') ? params.get('sort') : 'newest') as SortOrder;
 
-  const loadProperties = async () => {
-    try {
-      setLoading(true);
-      setFailed(false);
-      setProperties(await propertyAPI.getAll());
-    } catch (error) {
-      console.error('Failed to load properties:', error);
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
+  const setFilter = (name: string, value: string) => {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        return next;
+      },
+      // Typing in the search box should not add a history entry per letter
+      { replace: true, preventScrollReset: true },
+    );
   };
+
+  const filtered = Boolean(search || location || status || maxPrice);
 
   const locations = useMemo(
     () => [...new Set(properties.map((property) => property.location.trim()).filter(Boolean))].sort(),
@@ -45,64 +55,67 @@ export function PropertiesPage({ onViewProperty }: { onViewProperty: (id: string
     const term = search.trim().toLowerCase();
     const matches = properties.filter(
       (property) =>
-        (status === 'All' || property.status === status) &&
+        (!status || property.status === status) &&
         (!location || property.location.trim() === location) &&
-        (!term || `${property.title} ${property.location} ${property.size}`.toLowerCase().includes(term)),
+        (!maxPrice || priceValue(property.price) <= maxPrice) &&
+        (!term ||
+          [property.title, property.location, property.size, property.description, ...(property.features ?? [])]
+            .join(' ')
+            .toLowerCase()
+            .includes(term)),
     );
 
-    // The API already returns newest first
-    if (sort === 'newest') return matches;
+    if (sort === 'newest') {
+      // The API returns newest first; sort is stable, so that order holds within each status
+      return [...matches].sort((a, b) => statusRank[a.status] - statusRank[b.status]);
+    }
     const direction = sort === 'price-low' ? 1 : -1;
     return [...matches].sort((a, b) => direction * (priceValue(a.price) - priceValue(b.price)));
-  }, [properties, search, status, location, sort]);
-
-  const fieldClass =
-    'w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#2DB34A] focus:ring-2 focus:ring-[#2DB34A]/15';
+  }, [properties, search, status, location, maxPrice, sort]);
 
   return (
-    <div className="min-h-screen bg-white py-12">
+    <div className="bg-white py-12">
       <div className="mx-auto max-w-7xl px-4 lg:px-6">
-        <p className="text-sm font-bold uppercase tracking-wide text-[#5E2CA5]">All Properties</p>
-        <h1 className="mt-2 text-3xl font-extrabold text-[#111827]">Land for sale</h1>
+        <p className="text-sm font-bold uppercase tracking-wide text-brand-purple">All Properties</p>
+        <h1 className="mt-2 text-3xl font-extrabold text-ink">Land for sale</h1>
 
-        <div className="mt-6 mb-8 flex flex-col gap-3 lg:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_repeat(4,auto)]">
+          <div className="relative sm:col-span-2 lg:col-span-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
             <input
               className={`${fieldClass} pl-9`}
               type="search"
               aria-label="Search properties"
-              placeholder="Search by name, location or size"
+              placeholder="Search by name, location, size or feature"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setFilter('q', e.target.value)}
             />
           </div>
-          <select
-            className={`${fieldClass} lg:w-52`}
-            aria-label="Filter by location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          >
+          <select className={fieldClass} aria-label="Filter by location" value={location} onChange={(e) => setFilter('location', e.target.value)}>
             <option value="">All locations</option>
             {locations.map((name) => (
               <option key={name}>{name}</option>
             ))}
           </select>
-          <select
-            className={`${fieldClass} lg:w-40`}
-            aria-label="Filter by status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-          >
-            <option value="All">All statuses</option>
+          <select className={fieldClass} aria-label="Filter by price" value={maxPrice || ''} onChange={(e) => setFilter('max', e.target.value)}>
+            <option value="">Any price</option>
+            {MAX_PRICES.map((amount) => (
+              <option key={amount} value={amount}>
+                Up to KSh {amount.toLocaleString('en-KE')}
+              </option>
+            ))}
+          </select>
+          <select className={fieldClass} aria-label="Filter by status" value={status} onChange={(e) => setFilter('status', e.target.value)}>
+            <option value="">All statuses</option>
             <option value="Available">For Sale</option>
+            <option value="Reserved">Reserved</option>
             <option value="Sold">Sold</option>
           </select>
           <select
-            className={`${fieldClass} lg:w-48`}
+            className={fieldClass}
             aria-label="Sort properties"
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortOrder)}
+            onChange={(e) => setFilter('sort', e.target.value === 'newest' ? '' : e.target.value)}
           >
             <option value="newest">Newest first</option>
             <option value="price-low">Price: low to high</option>
@@ -110,37 +123,32 @@ export function PropertiesPage({ onViewProperty }: { onViewProperty: (id: string
           </select>
         </div>
 
-        {loading ? (
-          <div className="py-12 text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#2DB34A]" />
-            <p className="mt-4 text-gray-600">Loading properties...</p>
-          </div>
-        ) : failed ? (
-          <div className="py-12 text-center">
-            <p className="mb-4 text-gray-600">We could not load the properties. Please try again.</p>
-            <Button onClick={loadProperties} className="bg-[#2DB34A] hover:bg-[#23923B]">
-              Retry
-            </Button>
-          </div>
-        ) : visibleProperties.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-gray-600">
-              {properties.length === 0
-                ? 'No properties available at the moment.'
-                : 'No properties match your search.'}
+        <div className="mb-6 mt-4 flex min-h-8 items-center justify-between gap-3 text-sm text-gray-600">
+          {!loading && !failed && (
+            <p aria-live="polite">
+              {visibleProperties.length} {visibleProperties.length === 1 ? 'property' : 'properties'}
+              {filtered ? ' match your search' : ''}
             </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {visibleProperties.map((property) => (
-              <PropertyCard
-                key={property.id}
-                {...property}
-                onClick={() => onViewProperty(property.id)}
-              />
-            ))}
-          </div>
-        )}
+          )}
+          {filtered && (
+            <button
+              type="button"
+              onClick={() => setParams(sort === 'newest' ? {} : { sort }, { replace: true, preventScrollReset: true })}
+              className="font-semibold text-brand-purple hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        <PropertyGrid
+          properties={visibleProperties}
+          loading={loading}
+          failed={failed}
+          onRetry={retry}
+          skeletons={8}
+          empty={properties.length === 0 ? 'No properties available at the moment.' : 'No properties match your search. Try clearing some filters.'}
+        />
       </div>
     </div>
   );

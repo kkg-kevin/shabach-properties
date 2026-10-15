@@ -9,7 +9,9 @@ import leadById from '../api/leads/[id]';
 import leads from '../api/leads/index';
 import propertyById from '../api/properties/[id]';
 import properties from '../api/properties/index';
+import seo from '../api/seo';
 import share from '../api/share';
+import { parsePrice } from '../api/_lib/properties';
 
 type Handler = (req: any, res: any) => unknown;
 
@@ -88,7 +90,19 @@ describe('auth', () => {
 
     const cookie = await signIn();
     const check = await call(auth, 'GET', { cookie });
-    expect(check.body.data).toEqual({ authenticated: true });
+    expect(check.body.data).toEqual({ authenticated: true, emailAlerts: false });
+  });
+
+  it('tells the admin whether enquiry emails are switched on', async () => {
+    const cookie = await signIn();
+    vi.stubEnv('RESEND_API_KEY', 're_test');
+    vi.stubEnv('LEAD_NOTIFY_EMAIL', 'team@example.com');
+    try {
+      expect((await call(auth, 'GET', { cookie })).body.data.emailAlerts).toBe(true);
+      expect((await call(auth, 'GET')).body.data.emailAlerts).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('does not accept a forged or tampered session', async () => {
@@ -97,7 +111,7 @@ describe('auth', () => {
 
     for (const forged of [`9999999999.${signature}`, `9999999999.${'a'.repeat(64)}`, 'garbage']) {
       const check = await call(auth, 'GET', { cookie: forged });
-      expect(check.body.data).toEqual({ authenticated: false });
+      expect(check.body.data).toEqual({ authenticated: false, emailAlerts: false });
     }
   });
 
@@ -154,6 +168,53 @@ describe('properties', () => {
     expect((await call(propertyById, 'GET', { query: { id } })).code).toBe(404);
   });
 
+  it('stores prices as plain numbers', async () => {
+    expect(parsePrice('1,500,000')).toBe('1500000');
+    expect(parsePrice('KSh 2,000,000')).toBe('2000000');
+    expect(parsePrice('Ksh. 750k')).toBe('750000');
+    expect(parsePrice('1.5M')).toBe('1500000');
+    expect(() => parsePrice('call us')).toThrow('Enter the price as a number');
+    expect(() => parsePrice('1,000,000 - 2,000,000')).toThrow();
+
+    const cookie = await signIn();
+    const created = await call(properties, 'POST', { cookie, body: { ...plot, price: 'KSh 1.2M' } });
+    expect(created.body.data.price).toBe('1200000');
+  });
+
+  it('keeps hidden properties off the public site but shows them to the admin', async () => {
+    const cookie = await signIn();
+    const created = await call(properties, 'POST', { cookie, body: { ...plot, status: 'Hidden' } });
+    const { id } = created.body.data;
+    await call(properties, 'POST', { cookie, body: { ...plot, status: 'Reserved' } });
+
+    // Signed in or not, the plain list is the cacheable public one
+    const publicList = await call(properties, 'GET', { cookie });
+    expect(publicList.body.data.map((p: any) => p.status)).toEqual(['Reserved']);
+    expect(publicList.headers['Cache-Control']).toContain('s-maxage');
+
+    expect((await call(properties, 'GET', { query: { all: '1' } })).code).toBe(401);
+    const adminList = await call(properties, 'GET', { cookie, query: { all: '1' } });
+    expect(adminList.body.data).toHaveLength(2);
+    expect(adminList.headers['Cache-Control']).toBe('private, no-store');
+
+    expect((await call(propertyById, 'GET', { query: { id } })).code).toBe(404);
+    const adminRead = await call(propertyById, 'GET', { cookie, query: { id } });
+    expect(adminRead.code).toBe(200);
+    expect(adminRead.headers['Cache-Control']).toBe('private, no-store');
+
+    expect((await call(share, 'GET', { query: { id } })).body).not.toContain('Prime Plot');
+  });
+
+  it('saves the buyer details', async () => {
+    const cookie = await signIn();
+    const details = { paymentPlan: 'Deposit 100k', titleStatus: 'Ready title deed', mapUrl: 'https://maps.app.goo.gl/x' };
+    const created = await call(properties, 'POST', { cookie, body: { ...plot, ...details } });
+    expect(created.body.data).toMatchObject(details);
+
+    const badMap = await call(properties, 'POST', { cookie, body: { ...plot, mapUrl: 'javascript:alert(1)' } });
+    expect(badMap.code).toBe(400);
+  });
+
   it('returns 404 for malformed and unknown ids', async () => {
     expect((await call(propertyById, 'GET', { query: { id: 'not-an-id' } })).code).toBe(404);
     expect((await call(propertyById, 'GET', { query: { id: unknownId } })).code).toBe(404);
@@ -190,6 +251,20 @@ describe('images', () => {
     await call(propertyById, 'DELETE', { cookie, query: { id } });
     expect(store.data.images.size).toBe(0);
   });
+
+  it('stores a thumbnail next to its photo and removes both together', async () => {
+    const cookie = await signIn();
+    const photo = (await call(images, 'POST', { cookie, body: jpeg })).body.data.url as string;
+    const photoId = photo.match(/([\da-f-]{36})\.jpg$/)![1];
+
+    const thumb = await call(images, 'POST', { cookie, body: jpeg, query: { thumbOf: photoId } });
+    expect(thumb.body.data.url).toBe(photo.replace('.jpg', '-thumb.jpg'));
+    expect((await call(images, 'POST', { cookie, body: jpeg, query: { thumbOf: '../x' } })).code).toBe(400);
+
+    const created = await call(properties, 'POST', { cookie, body: { ...plot, images: [photo] } });
+    await call(propertyById, 'DELETE', { cookie, query: { id: created.body.data.id } });
+    expect(store.data.images.size).toBe(0);
+  });
 });
 
 describe('leads', () => {
@@ -204,10 +279,24 @@ describe('leads', () => {
     expect(list.body.data[0]).toMatchObject({ name: 'Jane', status: 'New' });
   });
 
-  it('validates contact details', async () => {
-    expect((await call(leads, 'POST', { body: { ...enquiry, phone: 'abc' } })).code).toBe(400);
-    expect((await call(leads, 'POST', { body: { ...enquiry, email: 'not-an-email' } })).code).toBe(400);
-    expect((await call(leads, 'POST', { body: { ...enquiry, name: '' } })).code).toBe(400);
+  it('validates contact details and names the field at fault', async () => {
+    const badPhone = await call(leads, 'POST', { body: { ...enquiry, phone: 'abc' } });
+    expect(badPhone.code).toBe(400);
+    expect(badPhone.body.field).toBe('phone');
+    expect((await call(leads, 'POST', { body: { ...enquiry, email: 'not-an-email' } })).body.field).toBe('email');
+    expect((await call(leads, 'POST', { body: { ...enquiry, name: '' } })).body.field).toBe('name');
+  });
+
+  it('accepts a preferred visit date from today onwards', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    expect((await call(leads, 'POST', { body: { ...enquiry, visitDate: today } })).code).toBe(201);
+    expect(store.data.leads[0].visitDate).toBe(today);
+
+    for (const visitDate of ['2020-01-01', 'tomorrow', '2999-01-01']) {
+      const res = await call(leads, 'POST', { body: { ...enquiry, visitDate } });
+      expect(res.code).toBe(400);
+      expect(res.body.field).toBe('visitDate');
+    }
   });
 
   it('silently drops submissions that fill in the hidden field', async () => {
@@ -234,6 +323,10 @@ describe('leads', () => {
     const patched = await call(leadById, 'PATCH', { cookie, query: { id }, body: { status: 'Contacted' } });
     expect(patched.body.data.status).toBe('Contacted');
 
+    const noted = await call(leadById, 'PATCH', { cookie, query: { id }, body: { notes: 'Visit on Saturday' } });
+    expect(noted.body.data).toMatchObject({ status: 'Contacted', notes: 'Visit on Saturday' });
+    expect((await call(leadById, 'PATCH', { cookie, query: { id }, body: {} })).code).toBe(400);
+
     expect((await call(leadById, 'DELETE', { cookie, query: { id } })).code).toBe(200);
     expect(store.data.leads).toHaveLength(0);
   });
@@ -251,6 +344,8 @@ describe('share preview', () => {
     const page = await call(share, 'GET', { query: { id } });
     expect(page.code).toBe(200);
     expect(page.body).toContain('Plot &quot;A&quot; &lt;b&gt; - KSh 1,500,000');
+    // No property photo: a text-only card rather than a stock photo
+    expect(page.body).not.toContain('og:image');
     expect(page.body).toContain(`https://example.com/properties/${id}`);
     expect(page.body).not.toContain('<b>');
   });
@@ -259,5 +354,23 @@ describe('share preview', () => {
     const page = await call(share, 'GET', { query: { id: 'nope' } });
     expect(page.code).toBe(200);
     expect(page.body).toContain('Shabach Properties Ltd');
+  });
+});
+
+describe('search engines', () => {
+  it('lets crawlers load the listings and points them to the sitemap', async () => {
+    const res = await call(seo, 'GET', { query: { file: 'robots' } });
+    expect(res.body).toContain('Allow: /api/properties');
+    expect(res.body).toContain('Sitemap: https://example.com/sitemap.xml');
+  });
+
+  it('lists every visible property in the sitemap', async () => {
+    const cookie = await signIn();
+    const shown = (await call(properties, 'POST', { cookie, body: plot })).body.data.id;
+    const hidden = (await call(properties, 'POST', { cookie, body: { ...plot, status: 'Hidden' } })).body.data.id;
+
+    const res = await call(seo, 'GET', { query: { file: 'sitemap' } });
+    expect(res.body).toContain(`https://example.com/properties/${shown}`);
+    expect(res.body).not.toContain(hidden);
   });
 });
