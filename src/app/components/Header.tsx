@@ -4,6 +4,7 @@ import { Menu, Phone, X } from 'lucide-react';
 import { Button } from './ui/button';
 import logo from '../../assets/images/logo.jpg';
 import { site } from '../../config/site';
+import { useOpenEnquiry } from './EnquiryDialog';
 
 export const navigation = [
   { name: 'Home', href: '/#home' },
@@ -12,6 +13,41 @@ export const navigation = [
   { name: 'About Us', href: '/#about' },
   { name: 'Contact', href: '/#contact' },
 ];
+
+// "Contact" opens the enquiry form over the current page instead of leaving it
+export function NavItem({
+  item,
+  className,
+  current = false,
+  onSelect,
+}: {
+  item: (typeof navigation)[number];
+  className: string;
+  current?: boolean;
+  onSelect?: () => void;
+}) {
+  const openEnquiry = useOpenEnquiry();
+
+  if (item.href === '/#contact') {
+    return (
+      <button
+        type="button"
+        className={`text-left ${className}`}
+        onClick={() => {
+          onSelect?.();
+          openEnquiry();
+        }}
+      >
+        {item.name}
+      </button>
+    );
+  }
+  return (
+    <Link to={item.href} className={className} aria-current={current ? 'page' : undefined} onClick={onSelect}>
+      {item.name}
+    </Link>
+  );
+}
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -54,14 +90,7 @@ export function Header() {
 
           <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
             {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={linkClass(item.href)}
-                aria-current={isCurrent(item.href) ? 'page' : undefined}
-              >
-                {item.name}
-              </Link>
+              <NavItem key={item.name} item={item} className={linkClass(item.href)} current={isCurrent(item.href)} />
             ))}
           </nav>
 
@@ -101,14 +130,13 @@ export function Header() {
           <nav id="mobile-menu" className="border-t py-4 md:hidden" aria-label="Main">
             <div className="flex flex-col">
               {navigation.map((item) => (
-                <Link
+                <NavItem
                   key={item.name}
-                  to={item.href}
+                  item={item}
                   className={`py-3 ${linkClass(item.href)}`}
-                  aria-current={isCurrent(item.href) ? 'page' : undefined}
-                >
-                  {item.name}
-                </Link>
+                  current={isCurrent(item.href)}
+                  onSelect={() => setIsMenuOpen(false)}
+                />
               ))}
             </div>
             <Button asChild variant="secondary" size="lg" className="mt-3 w-full">

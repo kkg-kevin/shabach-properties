@@ -9,6 +9,7 @@ import { PropertyDetail } from './components/PropertyDetail';
 import { PrivacyPage } from './components/PrivacyPage';
 import { NotFound } from './components/NotFound';
 import { WhatsAppButton, WhatsAppProvider } from './components/WhatsAppButton';
+import { EnquiryDialogProvider } from './components/EnquiryDialog';
 
 // Visitors never download the dashboard code unless they open /admin
 const AdminPage = lazy(() => import('./components/AdminPage').then((module) => ({ default: module.AdminPage })));
@@ -60,14 +61,16 @@ function PublicLayout() {
   const onPropertyPage = Boolean(useMatch('/properties/:id'));
 
   return (
-    <div className={`flex flex-1 flex-col ${onPropertyPage ? 'pb-20 lg:pb-0' : ''}`}>
-      <Header />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <Footer />
-      <WhatsAppButton className={onPropertyPage ? 'hidden lg:flex' : ''} />
-    </div>
+    <EnquiryDialogProvider>
+      <div className={`flex flex-1 flex-col ${onPropertyPage ? 'pb-20 lg:pb-0' : ''}`}>
+        <Header />
+        <main className="flex-1">
+          <Outlet />
+        </main>
+        <Footer />
+        <WhatsAppButton className={onPropertyPage ? 'hidden lg:flex' : ''} />
+      </div>
+    </EnquiryDialogProvider>
   );
 }
 

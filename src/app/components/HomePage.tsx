@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ArrowRight, CheckCircle, Clock, DollarSign, Lock, MapPin, Shield, Building2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { PropertyGrid } from './PropertyCard';
-import { EnquiryForm } from './EnquiryForm';
+import { useOpenEnquiry } from './EnquiryDialog';
 import { ImageWithFallback } from './ImageWithFallback';
 import { site } from '../../config/site';
 import { useProperties } from '../../hooks/useProperties';
@@ -24,14 +24,10 @@ const featuredRank: Record<PropertyStatus, number> = { Available: 0, Reserved: 1
 export function HomePage() {
   const { properties, loading, failed, retry } = useProperties();
   const { testimonials, buyingSteps } = site;
+  const openEnquiry = useOpenEnquiry();
 
   const featuredProperties = useMemo(
     () => [...properties].sort((a, b) => featuredRank[a.status] - featuredRank[b.status]).slice(0, 4),
-    [properties],
-  );
-
-  const locations = useMemo(
-    () => [...new Set(properties.map((property) => property.location.trim()).filter(Boolean))].sort(),
     [properties],
   );
 
@@ -53,7 +49,7 @@ export function HomePage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/20" />
 
-        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 py-12 lg:min-h-[640px] lg:grid-cols-[1.1fr_420px] lg:px-6">
+        <div className="relative mx-auto flex max-w-7xl items-center px-4 py-12 md:py-16 lg:min-h-[560px] lg:px-6">
           <div className="max-w-3xl">
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-green-bright/20 bg-white px-4 py-2 text-sm font-semibold text-brand-green shadow-sm">
               <CheckCircle className="h-4 w-4" />
@@ -72,8 +68,13 @@ export function HomePage() {
                   <ArrowRight className="h-5 w-5" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="border-brand-green px-8 text-brand-green hover:bg-brand-green/5">
-                <Link to="/#how-it-works">How Buying Works</Link>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-brand-green px-8 text-brand-green hover:bg-brand-green/5"
+                onClick={openEnquiry}
+              >
+                Enquire Now
               </Button>
             </div>
 
@@ -85,16 +86,6 @@ export function HomePage() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div id="contact" className="scroll-mt-24 rounded-lg border border-gray-200 bg-white p-6 shadow-2xl">
-            <EnquiryForm
-              idPrefix="home-enquiry"
-              heading="Enquire About Land"
-              subheading="Tell us what you are looking for and we will call you."
-              locations={locations}
-              showWhatsApp
-            />
           </div>
         </div>
       </section>
@@ -137,8 +128,8 @@ export function HomePage() {
             ))}
           </ol>
           <div className="mt-8 text-center">
-            <Button asChild size="lg">
-              <Link to="/#contact">Ask us anything</Link>
+            <Button size="lg" onClick={openEnquiry}>
+              Ask us anything
             </Button>
           </div>
         </div>

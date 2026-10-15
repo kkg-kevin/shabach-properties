@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { Building2, Clock, Facebook, Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
-import { navigation } from './Header';
+import { NavItem, navigation } from './Header';
 import { site } from '../../config/site';
 import { useProperties } from '../../hooks/useProperties';
 
@@ -73,9 +73,7 @@ export function Footer() {
             <ul className="mt-4 space-y-2 text-sm">
               {navigation.map((item) => (
                 <li key={item.name}>
-                  <Link to={item.href} className={linkClass}>
-                    {item.name}
-                  </Link>
+                  <NavItem item={item} className={linkClass} />
                 </li>
               ))}
             </ul>
