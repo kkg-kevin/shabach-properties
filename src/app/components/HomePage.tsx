@@ -61,7 +61,6 @@ export function HomePage() {
     [properties],
   );
   const locations = useMemo(() => [...new Set(properties.filter((property) => property.status === 'Available').map((property) => property.location.trim()).filter(Boolean))].sort(), [properties]);
-  const heroProperty = properties.find((property) => property.status === 'Available' && property.images?.[0]);
 
   const officeDetails = [
     { icon: Building2, value: site.officeAddress },
@@ -73,10 +72,10 @@ export function HomePage() {
     <div id="home" className="bg-white">
       <section className="relative overflow-hidden border-b border-gray-200 bg-tint">
         <ImageWithFallback
-          src={heroProperty?.images[0] ?? `${HERO_IMAGE}?w=1800`}
-          srcSet={heroProperty ? undefined : `${HERO_IMAGE}?w=800 800w, ${HERO_IMAGE}?w=1200 1200w, ${HERO_IMAGE}?w=1800 1800w`}
+          src={`${HERO_IMAGE}?w=1800`}
+          srcSet={`${HERO_IMAGE}?w=800 800w, ${HERO_IMAGE}?w=1200 1200w, ${HERO_IMAGE}?w=1800 1800w`}
           sizes="100vw"
-          alt={heroProperty ? `${heroProperty.title} in ${heroProperty.location}` : ''}
+          alt=""
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/20" />
