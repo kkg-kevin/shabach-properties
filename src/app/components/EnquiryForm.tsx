@@ -16,14 +16,27 @@ const emptyValues = { name: '', phone: '', email: '', preferredLocation: '', vis
 const PHONE = /^\+?[\d\s()-]{7,}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ATTRIBUTION_KEY = 'shabach-attribution-v1';
-const attribution = () => {
+type Attribution = {
+  source: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_term: string;
+  utm_content: string;
+};
+
+const attribution = (): Attribution => {
   const current = new URLSearchParams(window.location.search);
   let saved: Record<string, string> = {};
   try { saved = JSON.parse(sessionStorage.getItem(ATTRIBUTION_KEY) || '{}'); } catch { /* start fresh */ }
-  const fields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
-  const latest = Object.fromEntries(fields.map((field) => [field, current.get(field) || saved[field] || '']));
-  const source = current.get('utm_source') || saved.source || (document.referrer ? new URL(document.referrer).hostname : 'Direct');
-  const result = { ...latest, source };
+  const result: Attribution = {
+    source: current.get('utm_source') || saved.source || (document.referrer ? new URL(document.referrer).hostname : 'Direct'),
+    utm_source: current.get('utm_source') || saved.utm_source || '',
+    utm_medium: current.get('utm_medium') || saved.utm_medium || '',
+    utm_campaign: current.get('utm_campaign') || saved.utm_campaign || '',
+    utm_term: current.get('utm_term') || saved.utm_term || '',
+    utm_content: current.get('utm_content') || saved.utm_content || '',
+  };
   try { sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(result)); } catch { /* attribution is optional */ }
   return result;
 };

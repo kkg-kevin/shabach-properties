@@ -728,7 +728,7 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
                 <h2 className="mb-6 text-xl font-semibold">{editingId ? 'Edit Property' : 'Add New Property'}</h2>
                 <div className="mb-6 rounded-lg border border-brand-purple/20 bg-purple-50 p-4 text-sm text-gray-700">
                   <strong>Listing quality checklist:</strong> add several real site photos, a clear description, confirmed title status, nearby access and services, and the exact payment terms. Fill only details you can verify; buyers use these to decide whether to book a visit.
-                  <p className="mt-1">Current photos: {formData.images.length}; description: {formData.description.trim() ? 'added' : 'missing'}; title status: {formData.titleStatus.trim() ? 'added' : 'missing'}; payment terms: {formData.paymentPlan.trim() ? 'added' : 'missing'}.</p>
+                  <p className="mt-1">Current photos: {formData.images.length}; description: {formData.description?.trim() ? 'added' : 'missing'}; title status: {formData.titleStatus?.trim() ? 'added' : 'missing'}; payment terms: {formData.paymentPlan?.trim() ? 'added' : 'missing'}.</p>
                 </div>
                 <form onSubmit={handleSaveProperty} className="space-y-6">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

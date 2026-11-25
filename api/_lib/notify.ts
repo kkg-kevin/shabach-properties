@@ -7,6 +7,7 @@ interface LeadEmail {
   propertyTitle: string;
   visitDate: string;
   visitTime: string;
+  source: string;
 }
 
 export async function sendEnquiryReceipt(lead: LeadEmail) {
