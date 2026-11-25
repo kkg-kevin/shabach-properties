@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { track } from '@vercel/analytics';
 import { Link, useLocation, useNavigate } from 'react-router';
 import {
   ArrowLeft,
@@ -33,6 +34,33 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { cachedProperty, useProperties } from '../../hooks/useProperties';
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed';
+
+function AffordabilityEstimate({ price, paymentPlan }: { price: number; paymentPlan?: string }) {
+  const [deposit, setDeposit] = useState(20);
+  const [months, setMonths] = useState(12);
+  const balance = Math.max(0, price * (1 - deposit / 100));
+  return (
+    <details className="mt-5 rounded-lg border border-brand-purple/15 bg-purple-50/50 p-4" aria-label="Payment estimate">
+      <summary className="cursor-pointer font-semibold text-ink">Estimate deposit and monthly payments</summary>
+      <p className="mt-2 text-xs text-gray-600">This illustration assumes equal monthly payments and excludes fees or interest. Confirm actual terms with our team.</p>
+      {paymentPlan && <p className="mt-2 text-sm text-gray-700"><strong>Listed payment terms:</strong> {paymentPlan}</p>}
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <label className="text-sm">Deposit
+          <select className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-2" value={deposit} onChange={(e) => setDeposit(Number(e.target.value))}>
+            {[10, 20, 30, 40, 50].map((value) => <option key={value} value={value}>{value}%</option>)}
+          </select>
+        </label>
+        <label className="text-sm">Balance period
+          <select className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-2" value={months} onChange={(e) => setMonths(Number(e.target.value))}>
+            {[6, 12, 18, 24, 36].map((value) => <option key={value} value={value}>{value} months</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="mt-3 text-sm text-gray-700">Estimated deposit: <strong>{formatPrice(String(Math.round(price * deposit / 100)))}</strong></p>
+      <p className="text-sm text-gray-700">Estimated monthly balance: <strong>{formatPrice(String(Math.ceil(balance / months)))}</strong></p>
+    </details>
+  );
+}
 
 const panelClass = 'rounded-xl border border-gray-200 bg-white p-6';
 
@@ -110,6 +138,10 @@ export function PropertyDetail({ propertyId }: { propertyId: string }) {
   usePageWhatsAppMessage(property ? propertyWhatsAppMessage(property) : null);
   useListingStructuredData(property);
 
+  useEffect(() => {
+    if (property) track('Property Viewed', { property: property.title, status: property.status });
+  }, [property?.id]);
+
   // Back to wherever the visitor came from, keeping their filters and scroll position
   const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/properties'));
 
@@ -166,6 +198,7 @@ export function PropertyDetail({ propertyId }: { propertyId: string }) {
     document.getElementById('enquiry')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const bookVisit = () => {
+    track('Site Visit Requested', { property: property.title });
     setVisitRequest((count) => count + 1);
     scrollToEnquiry();
   };
@@ -223,6 +256,7 @@ export function PropertyDetail({ propertyId }: { propertyId: string }) {
               </div>
 
               <p className="mt-5 text-3xl font-bold text-brand-green md:text-4xl">{formatPrice(property.price)}</p>
+              <AffordabilityEstimate price={priceValue(property.price)} paymentPlan={property.paymentPlan} />
 
               {(sold || reserved) && (
                 <div className="mt-5 flex gap-3 rounded-lg bg-amber-50 p-4 text-amber-900">
@@ -298,23 +332,23 @@ export function PropertyDetail({ propertyId }: { propertyId: string }) {
             </section>
           </div>
 
-          <aside className="space-y-6">
+          <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             {/* Phones get the same actions in the bar along the bottom of the screen */}
             <div className={`${panelClass} hidden space-y-3 lg:block`}>
               <p className="text-sm text-gray-500">Interested in this plot?</p>
               <Button asChild variant="secondary" size="xl" className="w-full">
-                <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" onClick={() => track('WhatsApp Clicked', { property: property.title })}>
                   <MessageCircle className="h-5 w-5" />
                   Chat on WhatsApp
                 </a>
               </Button>
               {!sold && (
                 <Button size="xl" className="w-full" onClick={bookVisit}>
-                  Book a Site Visit
+                  Request a Site Visit
                 </Button>
               )}
               <div className="space-y-2 border-t border-gray-200 pt-4 text-sm text-gray-600">
-                <a href={site.phoneHref} className="flex items-center gap-2 hover:text-brand-green">
+                <a href={site.phoneHref} onClick={() => track('Phone Clicked', { property: property.title })} className="flex items-center gap-2 hover:text-brand-green">
                   <Phone className="h-4 w-4" />
                   {site.phoneDisplay}
                 </a>
@@ -329,7 +363,7 @@ export function PropertyDetail({ propertyId }: { propertyId: string }) {
               <EnquiryForm
                 idPrefix="property-enquiry"
                 heading={sold ? 'Ask about similar plots' : 'Send an Enquiry'}
-                subheading={sold ? undefined : 'Ask a question or choose a date for a site visit.'}
+                subheading={sold ? undefined : 'Ask a question or request a site visit. Our team will confirm the date with you.'}
                 property={property}
                 visitRequest={visitRequest}
               />
@@ -358,17 +392,17 @@ export function PropertyDetail({ propertyId }: { propertyId: string }) {
             <p className="truncate font-bold text-brand-green">{formatPrice(property.price)}</p>
           </div>
           <Button asChild variant="secondary" size="xl" className="w-12 px-0">
-            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" onClick={() => track('WhatsApp Clicked', { property: property.title })}>
               <MessageCircle className="h-5 w-5" />
             </a>
           </Button>
           <Button asChild variant="outline" size="xl" className="w-12 px-0">
-            <a href={site.phoneHref} aria-label="Call us">
+            <a href={site.phoneHref} aria-label="Call us" onClick={() => track('Phone Clicked', { property: property.title })}>
               <Phone className="h-5 w-5" />
             </a>
           </Button>
-          <Button size="xl" onClick={sold ? scrollToEnquiry : bookVisit}>
-            {sold ? 'Enquire' : 'Book Visit'}
+          <Button size="xl" className="px-3 text-sm" onClick={sold ? scrollToEnquiry : bookVisit}>
+            {sold ? 'Enquire' : 'Request Visit'}
           </Button>
         </div>
       </div>

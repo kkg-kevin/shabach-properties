@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { track } from '@vercel/analytics';
 import { Link, useLocation } from 'react-router';
 import { Menu, Phone, X } from 'lucide-react';
 import { Button } from './ui/button';
@@ -95,12 +96,12 @@ export function Header() {
           </nav>
 
           <div className="hidden items-center gap-4 lg:flex">
-            <a href={site.phoneHref} className="flex items-center gap-2 whitespace-nowrap text-sm text-gray-600 hover:text-brand-green">
+            <a href={site.phoneHref} onClick={() => track('Phone Clicked', { source: 'header' })} className="flex items-center gap-2 whitespace-nowrap text-sm text-gray-600 hover:text-brand-green">
               <Phone className="h-4 w-4 text-brand-green" />
               <span>{site.phoneDisplay}</span>
             </a>
             <Button asChild variant="secondary">
-              <a href={site.phoneHref}>Call Us</a>
+              <a href={site.phoneHref} onClick={() => track('Phone Clicked', { source: 'header_cta' })}>Call Us</a>
             </Button>
           </div>
 
@@ -108,6 +109,7 @@ export function Header() {
             {/* Calling is the main way buyers reach the team, so it stays one tap away */}
             <a
               href={site.phoneHref}
+              onClick={() => track('Phone Clicked', { source: 'mobile_header' })}
               className="rounded-full p-2.5 text-brand-green hover:bg-gray-100"
               aria-label={`Call us on ${site.phoneDisplay}`}
             >

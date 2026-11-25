@@ -10,8 +10,8 @@ export function PrivacyPage() {
     {
       title: 'What we collect',
       body: [
-        'When you send an enquiry we collect your name and phone number, and anything else you choose to give us: your email address, message, preferred location, preferred site visit date, and the property you asked about.',
-        'We do not use advertising or tracking cookies. We count visits to the site with Vercel Web Analytics, which does not use cookies or identify you.',
+        'When you send an enquiry we collect your name and phone number, and anything else you choose to give us: your email address, message, preferred location, preferred site visit date and time, and the property you asked about. We also record the page and campaign source that brought you to the enquiry so we can understand which listings and channels are useful.',
+        'We do not use advertising or tracking cookies. We use Vercel Web Analytics to count visits and measure actions such as property views, contact clicks, and enquiries. We also record the page and campaign source with an enquiry. These tools do not use cookies or identify you.',
       ],
     },
     {
@@ -23,7 +23,7 @@ export function PrivacyPage() {
     {
       title: 'Where it is kept',
       body: [
-        'Enquiries are stored in a secure database that only our team can access, and may also be emailed to our team so that we can reply quickly. Our website and database are run by service providers (Vercel and Supabase) on our behalf.',
+        'Enquiries are stored in a secure database that only our team can access, and may also be emailed to our team so that we can reply quickly. If you provide an email address, we may send a receipt confirming that we received your enquiry. Our website and database are run by service providers (Vercel, Supabase, and Resend for email) on our behalf.',
         'We delete enquiries once we no longer need them to help you.',
       ],
     },

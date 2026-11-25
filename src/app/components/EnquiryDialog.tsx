@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { track } from '@vercel/analytics';
 import { X } from 'lucide-react';
 import { EnquiryForm } from './EnquiryForm';
 import { useProperties } from '../../hooks/useProperties';
@@ -31,6 +32,7 @@ export function EnquiryDialogProvider({ children }: { children: React.ReactNode 
 
   const openDialog = useCallback(() => {
     returnFocus.current = document.activeElement as HTMLElement | null;
+    track('Enquiry Started', { source: window.location.pathname });
     setOpen(true);
   }, []);
 

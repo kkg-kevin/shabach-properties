@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router';
-import { ArrowRight, CheckCircle, Clock, DollarSign, Lock, MapPin, Shield, Building2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { track } from '@vercel/analytics';
+import { Link, useNavigate } from 'react-router';
+import { ArrowRight, CheckCircle, Clock, DollarSign, Lock, MapPin, Search, Shield, Building2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { PropertyGrid } from './PropertyCard';
 import { useOpenEnquiry } from './EnquiryDialog';
@@ -12,14 +13,43 @@ import type { PropertyStatus } from '../../utils/api';
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef';
 
 const trustIndicators = [
-  { icon: Shield, title: 'Verified Properties', description: 'Legally checked land with clear documents.' },
-  { icon: Lock, title: 'Secure Transactions', description: 'Transparent process from inquiry to transfer.' },
+  { icon: Shield, title: 'Property Due Diligence', description: 'Get guidance on title checks and property documents before you buy.' },
+  { icon: Lock, title: 'Clear Buying Process', description: 'Understand each step from your first enquiry through transfer.' },
   { icon: DollarSign, title: 'Affordable Prices', description: 'Competitive prices with flexible plans.' },
   { icon: MapPin, title: 'Prime Locations', description: 'High-growth areas across Kenya.' },
 ];
 
 // Plots that can be bought now come first; sold ones only fill any gaps
 const featuredRank: Record<PropertyStatus, number> = { Available: 0, Reserved: 1, Sold: 2, Hidden: 3 };
+
+function QuickPropertySearch({ locations }: { locations: string[] }) {
+  const navigate = useNavigate();
+  const [location, setLocation] = useState('');
+  const [budget, setBudget] = useState('');
+  const [plan, setPlan] = useState('');
+  const query = new URLSearchParams();
+  if (location) query.set('location', location);
+  if (budget) query.set('max', budget);
+  if (plan) query.set('plan', plan);
+  return (
+    <form className="mt-7 rounded-xl border border-gray-200 bg-white p-4 shadow-lg sm:p-5" onSubmit={(event) => { event.preventDefault(); track('Property Search Started', { source: 'home_hero' }); const params = query.toString(); navigate(`/properties${params ? `?${params}` : ''}`); }}>
+      <p className="mb-3 flex items-center gap-2 font-semibold text-ink"><Search className="h-4 w-4 text-brand-purple" />Find land that fits your plans</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_auto]">
+        <label className="sr-only" htmlFor="home-search-location">Location</label>
+        <select id="home-search-location" className="rounded-md border border-gray-300 bg-white px-3 py-2.5 text-base" value={location} onChange={(event) => setLocation(event.target.value)}>
+          <option value="">Any location</option>{locations.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <label className="sr-only" htmlFor="home-search-budget">Maximum budget in KSh</label>
+        <input id="home-search-budget" type="number" min="0" step="50000" inputMode="numeric" placeholder="Max budget (KSh)" className="rounded-md border border-gray-300 px-3 py-2.5 text-base" value={budget} onChange={(event) => setBudget(event.target.value)} />
+        <label className="sr-only" htmlFor="home-search-plan">Payment preference</label>
+        <select id="home-search-plan" className="rounded-md border border-gray-300 bg-white px-3 py-2.5 text-base" value={plan} onChange={(event) => setPlan(event.target.value)}>
+          <option value="">Any payment option</option><option value="yes">Payment plan available</option>
+        </select>
+        <Button type="submit" size="lg" className="w-full sm:col-span-2 lg:col-span-1"><Search className="h-4 w-4" />Find plots</Button>
+      </div>
+    </form>
+  );
+}
 
 export function HomePage() {
   const { properties, loading, failed, retry } = useProperties();
@@ -30,6 +60,8 @@ export function HomePage() {
     () => [...properties].sort((a, b) => featuredRank[a.status] - featuredRank[b.status]).slice(0, 4),
     [properties],
   );
+  const locations = useMemo(() => [...new Set(properties.filter((property) => property.status === 'Available').map((property) => property.location.trim()).filter(Boolean))].sort(), [properties]);
+  const heroProperty = properties.find((property) => property.status === 'Available' && property.images?.[0]);
 
   const officeDetails = [
     { icon: Building2, value: site.officeAddress },
@@ -41,10 +73,10 @@ export function HomePage() {
     <div id="home" className="bg-white">
       <section className="relative overflow-hidden border-b border-gray-200 bg-tint">
         <ImageWithFallback
-          src={`${HERO_IMAGE}?w=1800`}
-          srcSet={`${HERO_IMAGE}?w=800 800w, ${HERO_IMAGE}?w=1200 1200w, ${HERO_IMAGE}?w=1800 1800w`}
+          src={heroProperty?.images[0] ?? `${HERO_IMAGE}?w=1800`}
+          srcSet={heroProperty ? undefined : `${HERO_IMAGE}?w=800 800w, ${HERO_IMAGE}?w=1200 1200w, ${HERO_IMAGE}?w=1800 1800w`}
           sizes="100vw"
-          alt=""
+          alt={heroProperty ? `${heroProperty.title} in ${heroProperty.location}` : ''}
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/20" />
@@ -53,37 +85,30 @@ export function HomePage() {
           <div className="max-w-3xl">
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-green-bright/20 bg-white px-4 py-2 text-sm font-semibold text-brand-green shadow-sm">
               <CheckCircle className="h-4 w-4" />
-              Verified land for secure ownership
+              Land listings with clear buying guidance
             </p>
             <h1 className="max-w-2xl text-4xl font-extrabold leading-tight text-ink md:text-6xl">
               Find, Buy & Own the <span className="text-brand-purple">Perfect Land</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-gray-700">
-              Prime, affordable and secure land for your future. Invest today, build tomorrow.
+              Explore land listings, understand the buying process, and speak with our team before you decide.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg" className="px-8">
-                <Link to="/properties">
-                  View Properties
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
-              </Button>
+            <QuickPropertySearch locations={locations} />
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
                 size="lg"
                 variant="outline"
-                className="border-brand-green px-8 text-brand-green hover:bg-brand-green/5"
-                onClick={openEnquiry}
+                className="w-fit border-brand-green text-brand-green hover:bg-brand-green/5"
+                onClick={() => { track('Enquiry Started', { source: 'home_hero' }); openEnquiry(); }}
               >
-                Enquire Now
+                Have a question? Enquire
               </Button>
+              <Link to="/properties" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-purple hover:underline">Browse all plots <ArrowRight className="h-4 w-4" /></Link>
             </div>
 
-            <div className="mt-12 grid max-w-2xl grid-cols-2 gap-3 md:grid-cols-4">
-              {trustIndicators.map((indicator) => (
-                <div key={indicator.title} className="rounded-lg border border-gray-200 bg-white/90 p-4 text-center shadow-sm">
-                  <indicator.icon className="mx-auto mb-2 h-6 w-6 text-brand-green" />
-                  <p className="text-xs font-bold leading-snug text-ink">{indicator.title}</p>
-                </div>
+            <div className="mt-6 flex max-w-2xl flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-gray-700">
+              {['Prices shown on listings', 'Request a site visit', 'Speak directly with our team'].map((benefit) => (
+                <span key={benefit} className="inline-flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-brand-green" />{benefit}</span>
               ))}
             </div>
           </div>

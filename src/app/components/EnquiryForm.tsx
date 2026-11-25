@@ -1,19 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@vercel/analytics';
 import { Link } from 'react-router';
 import { CheckCircle, MessageCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { ApiError, leadAPI, type Property } from '../../utils/api';
 import { propertyWhatsAppMessage, whatsappUrl } from '../../config/site';
 
-type Field = 'name' | 'phone' | 'email' | 'preferredLocation' | 'visitDate' | 'message';
+type Field = 'name' | 'phone' | 'email' | 'preferredLocation' | 'visitDate' | 'visitTime' | 'message';
 
-const FIELD_ORDER: Field[] = ['name', 'phone', 'email', 'preferredLocation', 'visitDate', 'message'];
+const FIELD_ORDER: Field[] = ['name', 'phone', 'email', 'preferredLocation', 'visitDate', 'visitTime', 'message'];
 
 // `website` is the hidden anti-spam field; real visitors leave it empty
-const emptyValues = { name: '', phone: '', email: '', preferredLocation: '', visitDate: '', message: '', website: '' };
+const emptyValues = { name: '', phone: '', email: '', preferredLocation: '', visitDate: '', visitTime: '', message: '', website: '' };
 
 const PHONE = /^\+?[\d\s()-]{7,}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ATTRIBUTION_KEY = 'shabach-attribution-v1';
+const attribution = () => {
+  const current = new URLSearchParams(window.location.search);
+  let saved: Record<string, string> = {};
+  try { saved = JSON.parse(sessionStorage.getItem(ATTRIBUTION_KEY) || '{}'); } catch { /* start fresh */ }
+  const fields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+  const latest = Object.fromEntries(fields.map((field) => [field, current.get(field) || saved[field] || '']));
+  const source = current.get('utm_source') || saved.source || (document.referrer ? new URL(document.referrer).hostname : 'Direct');
+  const result = { ...latest, source };
+  try { sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(result)); } catch { /* attribution is optional */ }
+  return result;
+};
 
 // text-base keeps phones from zooming in when a field is tapped
 const inputClass =
@@ -45,8 +58,10 @@ export function EnquiryForm({
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState<{ name: string; phone: string } | null>(null);
+  const [sent, setSent] = useState<{ name: string; phone: string; visitDate: string; visitTime: string } | null>(null);
   const thanksRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => { attribution(); }, []);
 
   const canBookVisit = Boolean(property) && property?.status !== 'Sold';
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in the visitor's time zone
@@ -101,10 +116,19 @@ export function EnquiryForm({
       await leadAPI.create({
         ...values,
         visitDate: canBookVisit ? values.visitDate : '',
+        visitTime: canBookVisit ? values.visitTime : '',
         propertyId: property?.id,
         propertyTitle: property?.title,
+        source: attribution().source,
+        sourceUrl: window.location.href.slice(0, 500),
+        utmSource: attribution().utm_source,
+        utmMedium: attribution().utm_medium,
+        utmCampaign: attribution().utm_campaign,
+        utmTerm: attribution().utm_term,
+        utmContent: attribution().utm_content,
       });
-      setSent({ name: values.name.trim(), phone: values.phone.trim() });
+      track('Lead Submitted', { property: property?.title ?? 'General', has_visit_request: Boolean(values.visitDate) });
+      setSent({ name: values.name.trim(), phone: values.phone.trim(), visitDate: values.visitDate, visitTime: values.visitTime });
       setValues(emptyValues);
       setErrors({});
     } catch (error) {
@@ -129,7 +153,7 @@ export function EnquiryForm({
 
   const whatsappButton = (
     <Button asChild variant="secondary" className="w-full">
-      <a href={whatsappUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
+      <a href={whatsappUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer" onClick={() => track('WhatsApp Clicked', { property: property?.title ?? 'General' })}>
         <MessageCircle className="h-4 w-4" />
         Chat on WhatsApp
       </a>
@@ -145,8 +169,9 @@ export function EnquiryForm({
           Thank you, {sent.name.split(/\s+/)[0]}!
         </h3>
         <p className="text-gray-600">
-          We have received your enquiry and will call you on <strong className="text-ink">{sent.phone}</strong> shortly.
+          Our team has received your enquiry and will follow up on <strong className="text-ink">{sent.phone}</strong>.
         </p>
+        {sent.visitDate && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">We will contact you to confirm your preferred visit on <strong>{sent.visitDate}</strong>{sent.visitTime ? ` (${sent.visitTime})` : ''}. The visit is not booked until our team confirms it.</p>}
         <p className="text-sm text-gray-500">Prefer to chat now?</p>
         {whatsappButton}
         <button
@@ -224,37 +249,46 @@ export function EnquiryForm({
           {error('phone')}
         </div>
 
-        <div>
-          {label('email', 'Email address', true)}
-          <input {...fieldProps('email')} type="email" name="email" autoComplete="email" />
-          {error('email')}
-        </div>
-
-        {locations.length > 0 && (
-          <div>
-            {label('preferredLocation', 'Preferred location', true)}
-            <select {...fieldProps('preferredLocation')} name="preferredLocation">
-              <option value="">Any location</option>
-              {locations.map((location) => (
-                <option key={location}>{location}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {canBookVisit && (
-          <div>
-            {label('visitDate', 'Preferred site visit date', true)}
-            <input {...fieldProps('visitDate')} type="date" name="visitDate" min={today} />
-            {error('visitDate')}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              {label('visitDate', 'Preferred site visit date', true)}
+              <input {...fieldProps('visitDate')} type="date" name="visitDate" min={today} />
+              {error('visitDate')}
+            </div>
+            <div>
+              {label('visitTime', 'Preferred time', true)}
+              <select {...fieldProps('visitTime')} name="visitTime">
+                <option value="">Any time</option>
+                <option value="Morning (9am–12pm)">Morning (9am–12pm)</option>
+                <option value="Afternoon (12pm–4pm)">Afternoon (12pm–4pm)</option>
+              </select>
+            </div>
           </div>
         )}
 
-        <div>
-          {label('message', 'Message', true)}
-          <textarea {...fieldProps('message')} name="message" rows={3} />
-          {error('message')}
-        </div>
+        <details className="rounded-md border border-gray-200 px-3 py-2">
+          <summary className="cursor-pointer py-1 text-sm font-semibold text-brand-purple">Add email, location or a message (optional)</summary>
+          <div className="mt-3 space-y-4">
+            <div>
+              {label('email', 'Email address', true)}
+              <input {...fieldProps('email')} type="email" name="email" autoComplete="email" />
+              {error('email')}
+            </div>
+            {locations.length > 0 && <div>
+              {label('preferredLocation', 'Preferred location', true)}
+              <select {...fieldProps('preferredLocation')} name="preferredLocation">
+                <option value="">Any location</option>
+                {locations.map((location) => <option key={location}>{location}</option>)}
+              </select>
+            </div>}
+            <div>
+              {label('message', 'Message', true)}
+              <textarea {...fieldProps('message')} name="message" rows={3} />
+              {error('message')}
+            </div>
+          </div>
+        </details>
 
         {formError && (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -263,12 +297,12 @@ export function EnquiryForm({
         )}
 
         <Button type="submit" size="lg" disabled={submitting} className="w-full">
-          {submitting ? 'Sending...' : 'Send Enquiry'}
+          {submitting ? 'Sending...' : canBookVisit && (visitRequest > 0 || values.visitDate) ? 'Request Site Visit' : 'Send Enquiry'}
         </Button>
         {showWhatsApp && whatsappButton}
 
         <p className="text-xs text-gray-500">
-          We only use your details to contact you about this enquiry.{' '}
+          No obligation. We use your details to follow up on this enquiry.{' '}
           <Link to="/privacy" className="underline underline-offset-2 hover:text-ink">
             Privacy notice
           </Link>

@@ -1,6 +1,6 @@
 import { waitUntil } from '@vercel/functions';
 import { HttpError, body, forField, requireAdmin, route, text } from '../_lib/http.js';
-import { notifyNewLead } from '../_lib/notify.js';
+import { notifyNewLead, sendEnquiryReceipt } from '../_lib/notify.js';
 import { assertUnderLimit, clientKey, recordHit } from '../_lib/rateLimit.js';
 import { createLead, listLeads } from '../_lib/store.js';
 
@@ -58,6 +58,14 @@ export default route({
         text(input.preferredLocation, 'Preferred location', 150),
       ),
       visitDate: forField('visitDate', () => visitDate(input.visitDate)),
+      visitTime: forField('visitTime', () => text(input.visitTime, 'Visit time', 40)),
+      source: text(input.source, 'Source', 80),
+      sourceUrl: text(input.sourceUrl, 'Source URL', 500),
+      utmSource: text(input.utmSource, 'Campaign source', 120),
+      utmMedium: text(input.utmMedium, 'Campaign medium', 120),
+      utmCampaign: text(input.utmCampaign, 'Campaign name', 120),
+      utmTerm: text(input.utmTerm, 'Campaign term', 120),
+      utmContent: text(input.utmContent, 'Campaign content', 120),
       propertyId: text(input.propertyId, 'Property', 40),
       propertyTitle: text(input.propertyTitle, 'Property', 150),
     };
@@ -67,7 +75,7 @@ export default route({
     const [id] = await Promise.all([createLead(lead), recordHit(limitKey)]);
 
     // The email goes out after the visitor has their answer, so they are not kept waiting
-    waitUntil(notifyNewLead(lead));
+    waitUntil(Promise.all([notifyNewLead(lead), sendEnquiryReceipt(lead)]));
     return { id };
   },
 });

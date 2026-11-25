@@ -76,12 +76,19 @@ const propertyStatuses: { value: PropertyStatus; label: string }[] = [
   { value: 'Hidden', label: 'Hidden (not on the site)' },
 ];
 
-const leadStatuses: LeadStatus[] = ['New', 'Contacted', 'Closed'];
+const leadStatuses: LeadStatus[] = ['New', 'Contacted', 'Qualified', 'Visit Scheduled', 'Visited', 'Offer Made', 'Won', 'Lost', 'Closed'];
 
 const inputClass =
   'w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-brand-purple focus:border-transparent outline-none';
 
 const panelClass = 'rounded-xl border border-gray-200 bg-white';
+
+function localDateTime(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
 
 interface UploadItem {
   id: number;
@@ -93,14 +100,17 @@ function LeadCard({
   lead,
   onStatus,
   onNotes,
+  onFollowUp,
   onDelete,
 }: {
   lead: Lead;
   onStatus: (status: LeadStatus) => void;
   onNotes: (notes: string) => Promise<void>;
+  onFollowUp: (value: string) => Promise<void>;
   onDelete: () => void;
 }) {
   const [notes, setNotes] = useState(lead.notes ?? '');
+  const [followUp, setFollowUp] = useState(localDateTime(lead.followUpAt));
   const status = lead.status ?? 'New';
   const greeting = `Hello ${lead.name.split(/\s+/)[0]}, this is Shabach Properties following up on your enquiry${
     lead.propertyTitle ? ` about ${lead.propertyTitle}` : ''
@@ -109,13 +119,15 @@ function LeadCard({
   const saveNotes = () => {
     if (notes.trim() !== (lead.notes ?? '').trim()) onNotes(notes.trim());
   };
+  const reminderDue = Boolean(lead.followUpAt && Date.parse(lead.followUpAt) <= Date.now());
 
   return (
-    <article className={`${panelClass} p-6 ${status === 'New' ? 'border-l-4 border-l-amber-600' : ''}`}>
+    <article className={`${panelClass} p-6 ${reminderDue || status === 'New' ? 'border-l-4 border-l-amber-600' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-ink">{lead.name}</h3>
           <p className="text-sm text-gray-500">{formatDate(lead.createdAt, true)}</p>
+          {reminderDue && <p className="mt-1 text-sm font-semibold text-amber-800">Follow-up due</p>}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-600">
           Status
@@ -180,7 +192,7 @@ function LeadCard({
             <dt className="text-sm text-gray-500">Preferred site visit</dt>
             <dd className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 font-semibold text-amber-900">
               <Calendar className="h-4 w-4" />
-              {formatDate(lead.visitDate)}
+              {formatDate(lead.visitDate)}{lead.visitTime ? ` · ${lead.visitTime}` : ''}
             </dd>
           </div>
         )}
@@ -198,7 +210,12 @@ function LeadCard({
         )}
       </dl>
 
+      {(lead.source || lead.utmCampaign) && <p className="mt-3 text-xs text-gray-500">Source: {lead.source || 'Unknown'}{lead.utmCampaign ? ` · Campaign: ${lead.utmCampaign}` : ''}</p>}
+
       <div className="mt-4 border-t pt-4">
+        <label htmlFor={`follow-up-${lead.id}`} className="mb-1 block text-sm text-gray-500">Follow-up reminder</label>
+        <input id={`follow-up-${lead.id}`} type="datetime-local" value={followUp} onChange={(event) => setFollowUp(event.target.value)}
+          onBlur={() => onFollowUp(followUp)} className={`${inputClass} mb-3 text-sm`} />
         <label htmlFor={`notes-${lead.id}`} className="mb-1 block text-sm text-gray-500">
           Notes (only the team sees these; saved when you click away)
         </label>
@@ -376,6 +393,14 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
     }
   };
 
+  const handleLeadFollowUp = async (lead: Lead, value: string) => {
+    try {
+      const updated = await leadAPI.update(lead.id, { followUpAt: value ? new Date(value).toISOString() : null });
+      setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, followUpAt: updated.followUpAt } : item));
+      toast.success(value ? 'Follow-up reminder saved' : 'Follow-up reminder cleared');
+    } catch (error) { reportError(error, 'Failed to save follow-up reminder'); }
+  };
+
   const handleDeleteLead = async (lead: Lead) => {
     if (!confirm(`Delete the enquiry from ${lead.name}?`)) return;
 
@@ -462,6 +487,15 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
 
   const leadCount = (status: LeadStatus) => leads.filter((lead) => (lead.status ?? 'New') === status).length;
   const newLeads = leadCount('New');
+  const wonLeads = leadCount('Won');
+  const dueFollowUps = leads.filter((lead) => lead.followUpAt && Date.parse(lead.followUpAt) <= Date.now()).length;
+  const sourcePerformance = Object.entries(leads.reduce<Record<string, { total: number; won: number }>>((summary, lead) => {
+    const source = lead.utmSource || lead.source || 'Unknown';
+    summary[source] ??= { total: 0, won: 0 };
+    summary[source].total += 1;
+    if (lead.status === 'Won') summary[source].won += 1;
+    return summary;
+  }, {})).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
   const visibleLeads = leadFilter === 'All' ? leads : leads.filter((lead) => (lead.status ?? 'New') === leadFilter);
   const forSale = properties.filter((p) => p.status === 'Available').length;
   const normalisedPrice = normalisePrice(formData.price);
@@ -510,7 +544,7 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
         )}
 
         {/* Stats */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           <div className={`${panelClass} flex items-center gap-4 p-6`}>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-purple/10">
               <HomeIcon className="h-6 w-6 text-brand-purple" />
@@ -522,6 +556,14 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
                 <span className="ml-3 text-sm font-semibold text-brand-green">{forSale} for sale</span>
               </p>
             </div>
+          </div>
+          <div className={`${panelClass} flex items-center gap-4 p-6`}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 font-bold">{wonLeads}</div>
+            <div><p className="text-sm text-gray-500">Won enquiries</p><p className="text-xs text-gray-500">{leads.length ? `${Math.round(wonLeads / leads.length * 100)}% of leads` : 'No leads yet'}</p></div>
+          </div>
+          <div className={`${panelClass} flex items-center gap-4 p-6`}>
+            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${dueFollowUps ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'} font-bold`}>{dueFollowUps}</div>
+            <div><p className="text-sm text-gray-500">Follow-ups due</p><p className="text-xs text-gray-500">Check the leads tab</p></div>
           </div>
 
           <div className={`${panelClass} flex items-center gap-4 p-6`}>
@@ -639,6 +681,10 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
             {/* Leads Tab */}
             {activeTab === 'leads' && (
               <div className="space-y-4">
+                {sourcePerformance.length > 0 && <section className={`${panelClass} p-4`}>
+                  <h2 className="font-semibold text-ink">Lead sources</h2>
+                  <div className="mt-2 flex flex-wrap gap-2">{sourcePerformance.map(([source, counts]) => <span key={source} className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">{source}: {counts.total} leads · {counts.won} won</span>)}</div>
+                </section>}
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Show leads">
                   {(['All', ...leadStatuses] as const).map((filter) => (
                     <button
@@ -668,6 +714,7 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
                       lead={lead}
                       onStatus={(status) => handleLeadStatus(lead, status)}
                       onNotes={(notes) => handleLeadNotes(lead, notes)}
+                      onFollowUp={(value) => handleLeadFollowUp(lead, value)}
                       onDelete={() => handleDeleteLead(lead)}
                     />
                   ))
@@ -679,6 +726,10 @@ export function AdminDashboard({ onBack, onLogout, emailAlerts }: AdminDashboard
             {activeTab === 'form' && (
               <div className={`${panelClass} p-6`}>
                 <h2 className="mb-6 text-xl font-semibold">{editingId ? 'Edit Property' : 'Add New Property'}</h2>
+                <div className="mb-6 rounded-lg border border-brand-purple/20 bg-purple-50 p-4 text-sm text-gray-700">
+                  <strong>Listing quality checklist:</strong> add several real site photos, a clear description, confirmed title status, nearby access and services, and the exact payment terms. Fill only details you can verify; buyers use these to decide whether to book a visit.
+                  <p className="mt-1">Current photos: {formData.images.length}; description: {formData.description.trim() ? 'added' : 'missing'}; title status: {formData.titleStatus.trim() ? 'added' : 'missing'}; payment terms: {formData.paymentPlan.trim() ? 'added' : 'missing'}.</p>
+                </div>
                 <form onSubmit={handleSaveProperty} className="space-y-6">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
