@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { track } from '@vercel/analytics';
 import { Home, MapPin, Wallet } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { PhotoPlaceholder } from './PhotoPlaceholder';
@@ -27,6 +28,7 @@ export function PropertyCard({ property }: { property: Property }) {
   return (
     <Link
       to={`/properties/${id}`}
+      onClick={() => track('Property Opened', { property: title, status })}
       className="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm outline-none transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:ring-4 focus-visible:ring-brand-green-bright/40"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -56,9 +58,9 @@ export function PropertyCard({ property }: { property: Property }) {
           {size}
         </p>
         {paymentPlan && (
-          <p className="mb-2 flex items-center gap-1 text-sm text-gray-600">
+          <p className="mb-2 flex items-center gap-1 truncate text-sm text-gray-600" title={paymentPlan}>
             <Wallet className="h-4 w-4 shrink-0 text-brand-purple" />
-            Payment plan available
+            <span className="truncate">{paymentPlan}</span>
           </p>
         )}
 

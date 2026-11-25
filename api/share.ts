@@ -19,15 +19,17 @@ function escapeHtml(value: string) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const origin = `https://${req.headers.host}`;
   let title = 'Shabach Properties Ltd | Prime & Affordable Land for Sale in Kenya';
-  let description = 'Prime, affordable and verified land in Kenya. Browse available plots and book a site visit.';
+  let description = 'Browse land listings in Kenya, review the buying process, and book a site visit.';
   let image = SITE_IMAGE;
   let url = `${origin}/properties`;
+  let price = '';
 
   try {
     const { id } = req.query;
     const property = isId(id) ? await getProperty(id) : null;
     if (property && property.status !== 'Hidden') {
       title = `${property.title} - ${formatPrice(property.price)} | Shabach Properties`;
+      price = formatPrice(property.price);
       description = [property.location, property.size, property.description].filter(Boolean).join(' · ').slice(0, 300);
       url = `${origin}/properties/${id}`;
       // A property without photos gets a text-only preview rather than a stock photo
@@ -47,11 +49,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `<meta property="og:url" content="${escapeHtml(url)}">`,
     image && `<meta property="og:image" content="${escapeHtml(image)}">`,
     `<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">`,
+    price && `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@type': 'RealEstateListing', name: title, url, image, offers: { '@type': 'Offer', price: propertyPrice(price), priceCurrency: 'KES' } }).replace(/</g, '\\u003c')}</script>`,
   ].filter(Boolean);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
   return res
     .status(200)
-    .send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">${tags.join('')}</head><body><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></body></html>`);
+    .send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">${tags.join('')}</head><body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p>${price ? `<p>${escapeHtml(price)}</p>` : ''}<a href="${escapeHtml(url)}">View property details</a></main></body></html>`);
+}
+
+function propertyPrice(price: string) {
+  return price.replace(/[^\d]/g, '');
 }

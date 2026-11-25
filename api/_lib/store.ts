@@ -29,11 +29,20 @@ export interface LeadInput {
   propertyId: string;
   propertyTitle: string;
   visitDate: string;
+  visitTime: string;
+  source: string;
+  sourceUrl: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  utmTerm: string;
+  utmContent: string;
 }
 
 export interface LeadChanges {
   status?: string;
   notes?: string;
+  follow_up_at?: string | null;
 }
 
 let client: SupabaseClient | null = null;
@@ -157,6 +166,15 @@ function toLead(row: any) {
     propertyId: row.property_id as string,
     propertyTitle: row.property_title as string,
     visitDate: (row.visit_date ?? '') as string,
+    visitTime: (row.visit_time ?? '') as string,
+    source: (row.source ?? '') as string,
+    sourceUrl: (row.source_url ?? '') as string,
+    utmSource: (row.utm_source ?? '') as string,
+    utmMedium: (row.utm_medium ?? '') as string,
+    utmCampaign: (row.utm_campaign ?? '') as string,
+    utmTerm: (row.utm_term ?? '') as string,
+    utmContent: (row.utm_content ?? '') as string,
+    followUpAt: (row.follow_up_at ?? '') as string,
     notes: (row.notes ?? '') as string,
     status: row.status as string,
     createdAt: row.created_at as string,
@@ -181,6 +199,14 @@ export async function createLead(input: LeadInput) {
         property_id: input.propertyId,
         property_title: input.propertyTitle,
         visit_date: input.visitDate || null,
+        visit_time: input.visitTime,
+        source: input.source,
+        source_url: input.sourceUrl,
+        utm_source: input.utmSource,
+        utm_medium: input.utmMedium,
+        utm_campaign: input.utmCampaign,
+        utm_term: input.utmTerm,
+        utm_content: input.utmContent,
       })
       .select('id')
       .single(),
@@ -192,7 +218,7 @@ export async function updateLead(id: string, changes: LeadChanges) {
   const row = check(
     await db()
       .from('leads')
-      .update({ ...changes, updated_at: new Date().toISOString() })
+    .update({ ...changes, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .maybeSingle(),

@@ -29,6 +29,15 @@ create table if not exists public.leads (
   property_id text not null default '',
   property_title text not null default '',
   visit_date date,
+  visit_time text not null default '',
+  source text not null default '',
+  source_url text not null default '',
+  utm_source text not null default '',
+  utm_medium text not null default '',
+  utm_campaign text not null default '',
+  utm_term text not null default '',
+  utm_content text not null default '',
+  follow_up_at timestamptz,
   notes text not null default '',
   status text not null default 'New' check (status in ('New', 'Contacted', 'Closed')),
   created_at timestamptz not null default now(),
@@ -47,6 +56,19 @@ alter table public.properties add column if not exists title_status text not nul
 alter table public.properties add column if not exists map_url text not null default '';
 alter table public.leads add column if not exists visit_date date;
 alter table public.leads add column if not exists notes text not null default '';
+alter table public.leads add column if not exists visit_time text not null default '';
+alter table public.leads add column if not exists source text not null default '';
+alter table public.leads add column if not exists source_url text not null default '';
+alter table public.leads add column if not exists utm_source text not null default '';
+alter table public.leads add column if not exists utm_medium text not null default '';
+alter table public.leads add column if not exists utm_campaign text not null default '';
+alter table public.leads add column if not exists utm_term text not null default '';
+alter table public.leads add column if not exists utm_content text not null default '';
+alter table public.leads add column if not exists follow_up_at timestamptz;
+
+alter table public.leads drop constraint if exists leads_status_check;
+alter table public.leads add constraint leads_status_check
+  check (status in ('New', 'Contacted', 'Qualified', 'Visit Scheduled', 'Visited', 'Offer Made', 'Won', 'Lost', 'Closed'));
 
 -- Reserved: under offer. Hidden: kept in the admin but not shown on the site.
 alter table public.properties drop constraint if exists properties_status_check;

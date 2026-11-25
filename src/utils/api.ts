@@ -1,5 +1,5 @@
 export type PropertyStatus = 'Available' | 'Reserved' | 'Sold' | 'Hidden';
-export type LeadStatus = 'New' | 'Contacted' | 'Closed';
+export type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Visit Scheduled' | 'Visited' | 'Offer Made' | 'Won' | 'Lost' | 'Closed';
 
 export interface Property {
   id: string;
@@ -28,6 +28,15 @@ export interface Lead {
   propertyId?: string;
   propertyTitle?: string;
   visitDate?: string;
+  visitTime?: string;
+  source?: string;
+  sourceUrl?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+  followUpAt?: string;
   notes?: string;
   status?: LeadStatus;
   createdAt: string;
@@ -41,7 +50,7 @@ export interface AuthStatus {
 
 export type NewProperty = Omit<Property, 'id' | 'createdAt' | 'updatedAt'>;
 // `website` is the hidden anti-spam field; real visitors leave it empty
-export type NewLead = Omit<Lead, 'id' | 'createdAt' | 'status' | 'notes'> & { website?: string };
+export type NewLead = Omit<Lead, 'id' | 'createdAt' | 'status' | 'notes' | 'followUpAt'> & { website?: string };
 
 // `field` names the form field the server rejected, when there is one
 export class ApiError extends Error {
@@ -145,7 +154,7 @@ export const propertyAPI = {
 export const leadAPI = {
   getAll: () => request<Lead[]>('/leads'),
   create: (lead: NewLead) => request<{ id: string }>('/leads', 'POST', lead),
-  update: (id: string, changes: { status?: LeadStatus; notes?: string }) =>
+  update: (id: string, changes: { status?: LeadStatus; notes?: string; followUpAt?: string | null }) =>
     request<Lead>(`/leads/${encodeURIComponent(id)}`, 'PATCH', changes),
   delete: (id: string) => request<null>(`/leads/${encodeURIComponent(id)}`, 'DELETE'),
 };
